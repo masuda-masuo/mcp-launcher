@@ -1,1 +1,9 @@
-bW9kdWxlIGdpdGh1Yi5jb20vbWFzdWRhLW1hc3VvL21jcC1sYXVuY2hlcgoKZ28gMS4yMi4yCgpyZXF1aXJlICgKCWdpdGh1Yi5jb20vZGFuaWVsam9vcy93aW5jcmVkIHYxLjIuMyAvLyBpbmRpcmVjdAoJZ2l0aHViLmNvbS9nb2RidXMvZGJ1cy92NSB2NS4yLjIgLy8gaW5kaXJlY3QKCWdpdGh1Yi5jb20vemFsYW5kby9nby1rZXlyaW5nIHYwLjIuOCAvLyBpbmRpcmVjdAopCg==
+module github.com/masuda-masuo/mcp-launcher
+
+go 1.22.2
+
+require (
+	github.com/danieljoos/wincred v1.2.3 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
+	github.com/zalando/go-keyring v0.2.8 // indirect
+)
