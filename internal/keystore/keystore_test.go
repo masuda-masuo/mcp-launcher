@@ -1,1 +1,59 @@
-cGFja2FnZSBrZXlzdG9yZQoKaW1wb3J0ICJ0ZXN0aW5nIgoKZnVuYyBUZXN0TWVtb3J5U3RvcmVfU2V0QW5kR2V0KHQgKnRlc3RpbmcuVCkgewoJcyA6PSBOZXdNZW1vcnlTdG9yZSgpCgoJaWYgZXJyIDo9IHMuU2V0KCJteWtleSIsICJteXZhbHVlIik7IGVyciAhPSBuaWwgewoJCXQuRmF0YWxmKCJTZXQgZmFpbGVkOiAldiIsIGVycikKCX0KCglnb3QsIGVyciA6PSBzLkdldCgibXlrZXkiKQoJaWYgZXJyICE9IG5pbCB7CgkJdC5GYXRhbGYoIkdldCBmYWlsZWQ6ICV2IiwgZXJyKQoJfQoJaWYgZ290ICE9ICJteXZhbHVlIiB7CgkJdC5FcnJvcmYoImV4cGVjdGVkICVxLCBnb3QgJXEiLCAibXl2YWx1ZSIsIGdvdCkKCX0KfQoKZnVuYyBUZXN0TWVtb3J5U3RvcmVfR2V0Tm90Rm91bmQodCAqdGVzdGluZy5UKSB7CglzIDo9IE5ld01lbW9yeVN0b3JlKCkKCglfLCBlcnIgOj0gcy5HZXQoIm1pc3NpbmciKQoJaWYgZXJyID09IG5pbCB7CgkJdC5GYXRhbCgiZXhwZWN0ZWQgZXJyb3IgZm9yIG1pc3Npbmcga2V5LCBnb3QgbmlsIikKCX0KCWlmICFJc05vdEZvdW5kKGVycikgewoJCXQuRXJyb3JmKCJleHBlY3RlZCBFcnJOb3RGb3VuZCwgZ290ICVUOiAldiIsIGVyciwgZXJyKQoJfQp9CgpmdW5jIFRlc3RNZW1vcnlTdG9yZV9EZWxldGUodCAqdGVzdGluZy5UKSB7CglzIDo9IE5ld01lbW9yeVN0b3JlKCkKCXMuU2V0KCJrZXkiLCAidmFsdWUiKQoKCWlmIGVyciA6PSBzLkRlbGV0ZSgia2V5Iik7IGVyciAhPSBuaWwgewoJCXQuRmF0YWxmKCJEZWxldGUgZmFpbGVkOiAldiIsIGVycikKCX0KCglfLCBlcnIgOj0gcy5HZXQoImtleSIpCglpZiAhSXNOb3RGb3VuZChlcnIpIHsKCQl0LkVycm9yZigiZXhwZWN0ZWQgRXJyTm90Rm91bmQgYWZ0ZXIgZGVsZXRlLCBnb3QgJXYiLCBlcnIpCgl9Cn0KCmZ1bmMgVGVzdE1lbW9yeVN0b3JlX092ZXJ3cml0ZSh0ICp0ZXN0aW5nLlQpIHsKCXMgOj0gTmV3TWVtb3J5U3RvcmUoKQoJcy5TZXQoImtleSIsICJmaXJzdCIpCglzLlNldCgia2V5IiwgInNlY29uZCIpCgoJZ290LCBlcnIgOj0gcy5HZXQoImtleSIpCglpZiBlcnIgIT0gbmlsIHsKCQl0LkZhdGFsZigiR2V0IGZhaWxlZDogJXYiLCBlcnIpCgl9CglpZiBnb3QgIT0gInNlY29uZCIgewoJCXQuRXJyb3JmKCJleHBlY3RlZCAlcSBhZnRlciBvdmVyd3JpdGUsIGdvdCAlcSIsICJzZWNvbmQiLCBnb3QpCgl9Cn0K
+package keystore
+
+import "testing"
+
+func TestMemoryStore_SetAndGet(t *testing.T) {
+	s := NewMemoryStore()
+
+	if err := s.Set("mykey", "myvalue"); err != nil {
+		t.Fatalf("Set failed: %v", err)
+	}
+
+	got, err := s.Get("mykey")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got != "myvalue" {
+		t.Errorf("expected %q, got %q", "myvalue", got)
+	}
+}
+
+func TestMemoryStore_GetNotFound(t *testing.T) {
+	s := NewMemoryStore()
+
+	_, err := s.Get("missing")
+	if err == nil {
+		t.Fatal("expected error for missing key, got nil")
+	}
+	if !IsNotFound(err) {
+		t.Errorf("expected ErrNotFound, got %T: %v", err, err)
+	}
+}
+
+func TestMemoryStore_Delete(t *testing.T) {
+	s := NewMemoryStore()
+	s.Set("key", "value")
+
+	if err := s.Delete("key"); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	_, err := s.Get("key")
+	if !IsNotFound(err) {
+		t.Errorf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestMemoryStore_Overwrite(t *testing.T) {
+	s := NewMemoryStore()
+	s.Set("key", "first")
+	s.Set("key", "second")
+
+	got, err := s.Get("key")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got != "second" {
+		t.Errorf("expected %q after overwrite, got %q", "second", got)
+	}
+}

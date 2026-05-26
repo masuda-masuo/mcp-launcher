@@ -1,1 +1,36 @@
-cGFja2FnZSBrZXlzdG9yZQoKaW1wb3J0ICJzeW5jIgoKLy8gTWVtb3J5U3RvcmUgaXMgYW4gaW4tbWVtb3J5IGtleXN0b3JlIGZvciB1c2UgaW4gdGVzdHMuCi8vIEl0IGlzIHNhZmUgZm9yIGNvbmN1cnJlbnQgdXNlLgp0eXBlIE1lbW9yeVN0b3JlIHN0cnVjdCB7CgltdSAgIHN5bmMuUldNdXRleAoJZGF0YSBtYXBbc3RyaW5nXXN0cmluZwp9CgovLyBOZXdNZW1vcnlTdG9yZSBjcmVhdGVzIGEgbmV3IGVtcHR5IE1lbW9yeVN0b3JlLgpmdW5jIE5ld01lbW9yeVN0b3JlKCkgKk1lbW9yeVN0b3JlIHsKCXJldHVybiAmTWVtb3J5U3RvcmV7ZGF0YTogbWFrZShtYXBbc3RyaW5nXXN0cmluZyl9Cn0KCmZ1bmMgKG0gKk1lbW9yeVN0b3JlKSBHZXQoa2V5IHN0cmluZykgKHN0cmluZywgZXJyb3IpIHsKCW0ubXUuUkxvY2soKQoJZGVmZXIgbS5tdS5SVW5sb2NrKCkKCXYsIG9rIDo9IG0uZGF0YVtrZXldCglpZiAhb2sgewoJCXJldHVybiAiIiwgJkVyck5vdEZvdW5ke0tleToga2V5fQoJfQoJcmV0dXJuIHYsIG5pbAp9CgpmdW5jIChtICpNZW1vcnlTdG9yZSkgU2V0KGtleSwgdmFsdWUgc3RyaW5nKSBlcnJvciB7CgltLm11LkxvY2soKQoJZGVmZXIgbS5tdS5VbmxvY2soKQoJbS5kYXRhW2tleV0gPSB2YWx1ZQoJcmV0dXJuIG5pbAp9CgpmdW5jIChtICpNZW1vcnlTdG9yZSkgRGVsZXRlKGtleSBzdHJpbmcpIGVycm9yIHsKCW0ubXUuTG9jaygpCglkZWZlciBtLm11LlVubG9jaygpCglkZWxldGUobS5kYXRhLCBrZXkpCglyZXR1cm4gbmlsCn0K
+package keystore
+
+import "sync"
+
+type MemoryStore struct {
+	mu   sync.RWMutex
+	data map[string]string
+}
+
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{data: make(map[string]string)}
+}
+
+func (m *MemoryStore) Get(key string) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.data[key]
+	if !ok {
+		return "", &ErrNotFound{Key: key}
+	}
+	return v, nil
+}
+
+func (m *MemoryStore) Set(key, value string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.data[key] = value
+	return nil
+}
+
+func (m *MemoryStore) Delete(key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.data, key)
+	return nil
+}

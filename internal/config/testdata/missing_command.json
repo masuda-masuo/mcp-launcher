@@ -1,1 +1,7 @@
-ewogICJnaXRodWIiOiB7CiAgICAiZW52X2tleXMiOiB7CiAgICAgICJHSVRIVUJfVE9LRU4iOiAibWNwLWxhdW5jaGVyL2dpdGh1YiIKICAgIH0KICB9Cn0K
+{
+  "github": {
+    "env_keys": {
+      "GITHUB_TOKEN": "mcp-launcher/github"
+    }
+  }
+}

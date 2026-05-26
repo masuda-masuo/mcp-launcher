@@ -1,1 +1,16 @@
-ewogICJnaXRodWIiOiB7CiAgICAiY29tbWFuZCI6ICJnaXRodWItbWNwLXNlcnZlciIsCiAgICAiYXJncyI6IFsiLS1zdGRpbyJdLAogICAgImVudl9rZXlzIjogewogICAgICAiR0lUSFVCX1RPS0VOIjogIm1jcC1sYXVuY2hlci9naXRodWIiCiAgICB9CiAgfSwKICAiYXdzIjogewogICAgImNvbW1hbmQiOiAiYXdzLW1jcC1zZXJ2ZXIiLAogICAgImVudl9rZXlzIjogewogICAgICAiQVdTX0FDQ0VTU19LRVlfSUQiOiAibWNwLWxhdW5jaGVyL2F3cy1rZXkiLAogICAgICAiQVdTX1NFQ1JFVF9BQ0NFU1NfS0VZIjogIm1jcC1sYXVuY2hlci9hd3Mtc2VjcmV0IgogICAgfQogIH0KfQo=
+{
+  "github": {
+    "command": "github-mcp-server",
+    "args": ["--stdio"],
+    "env_keys": {
+      "GITHUB_TOKEN": "mcp-launcher/github"
+    }
+  },
+  "aws": {
+    "command": "aws-mcp-server",
+    "env_keys": {
+      "AWS_ACCESS_KEY_ID": "mcp-launcher/aws-key",
+      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/aws-secret"
+    }
+  }
+}

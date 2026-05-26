@@ -1,1 +1,5 @@
-ewogICJnaXRodWIiOiB7CiAgICAiY29tbWFuZCI6ICJnaXRodWItbWNwLXNlcnZlciIKICB9Cn0K
+{
+  "github": {
+    "command": "github-mcp-server"
+  }
+}

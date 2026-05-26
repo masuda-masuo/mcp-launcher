@@ -1,1 +1,43 @@
-cGFja2FnZSBrZXlzdG9yZQoKaW1wb3J0ICgKCSJmbXQiCgoJZ29rZXlyaW5nICJnaXRodWIuY29tL3phbGFuZG8vZ28ta2V5cmluZyIKKQoKY29uc3Qgc2VydmljZSA9ICJtY3AtbGF1bmNoZXIiCgovLyBvc1N0b3JlIHdyYXBzIHRoZSBnby1rZXlyaW5nIGxpYnJhcnkgdG8gcHJvdmlkZQovLyBjcm9zcy1wbGF0Zm9ybSBrZXlzdG9yZSBhY2Nlc3MgKFdpbmRvd3MgQ3JlZGVudGlhbCBNYW5hZ2VyLAovLyBtYWNPUyBLZXljaGFpbiwgTGludXggbGlic2VjcmV0KS4KdHlwZSBvc1N0b3JlIHN0cnVjdHt9CgovLyBOZXdPU1N0b3JlIHJldHVybnMgYSBTdG9yZSBiYWNrZWQgYnkgdGhlIE9TIG5hdGl2ZSBrZXlzdG9yZS4KZnVuYyBOZXdPU1N0b3JlKCkgKFN0b3JlLCBlcnJvcikgewoJcmV0dXJuICZvc1N0b3Jle30sIG5pbAp9CgpmdW5jIChvICpvc1N0b3JlKSBHZXQoa2V5IHN0cmluZykgKHN0cmluZywgZXJyb3IpIHsKCXZhbHVlLCBlcnIgOj0gZ29rZXlyaW5nLkdldChzZXJ2aWNlLCBrZXkpCglpZiBlcnIgPT0gZ29rZXlyaW5nLkVyck5vdEZvdW5kIHsKCQlyZXR1cm4gIiIsICZFcnJOb3RGb3VuZHtLZXk6IGtleX0KCX0KCWlmIGVyciAhPSBuaWwgewoJCXJldHVybiAiIiwgZm10LkVycm9yZigia2V5c3RvcmUgZ2V0ICVxOiAldyIsIGtleSwgZXJyKQoJfQoJcmV0dXJuIHZhbHVlLCBuaWwKfQoKZnVuYyAobyAqb3NTdG9yZSkgU2V0KGtleSwgdmFsdWUgc3RyaW5nKSBlcnJvciB7CglpZiBlcnIgOj0gZ29rZXlyaW5nLlNldChzZXJ2aWNlLCBrZXksIHZhbHVlKTsgZXJyICE9IG5pbCB7CgkJcmV0dXJuIGZtdC5FcnJvcmYoImtleXN0b3JlIHNldCAlcTogJXciLCBrZXksIGVycikKCX0KCXJldHVybiBuaWwKfQoKZnVuYyAobyAqb3NTdG9yZSkgRGVsZXRlKGtleSBzdHJpbmcpIGVycm9yIHsKCWlmIGVyciA6PSBnb2tleXJpbmcuRGVsZXRlKHNlcnZpY2UsIGtleSk7IGVyciAhPSBuaWwgewoJCWlmIGVyciA9PSBnb2tleXJpbmcuRXJyTm90Rm91bmQgewoJCQlyZXR1cm4gJkVyck5vdEZvdW5ke0tleToga2V5fQoJCX0KCQlyZXR1cm4gZm10LkVycm9yZigia2V5c3RvcmUgZGVsZXRlICVxOiAldyIsIGtleSwgZXJyKQoJfQoJcmV0dXJuIG5pbAp9Cg==
+package keystore
+
+import (
+	"fmt"
+
+	gokeyring "github.com/zalando/go-keyring"
+)
+
+const service = "mcp-launcher"
+
+type osStore struct{}
+
+func NewOSStore() (Store, error) {
+	return &osStore{}, nil
+}
+
+func (o *osStore) Get(key string) (string, error) {
+	value, err := gokeyring.Get(service, key)
+	if err == gokeyring.ErrNotFound {
+		return "", &ErrNotFound{Key: key}
+	}
+	if err != nil {
+		return "", fmt.Errorf("keystore get %q: %w", key, err)
+	}
+	return value, nil
+}
+
+func (o *osStore) Set(key, value string) error {
+	if err := gokeyring.Set(service, key, value); err != nil {
+		return fmt.Errorf("keystore set %q: %w", key, err)
+	}
+	return nil
+}
+
+func (o *osStore) Delete(key string) error {
+	if err := gokeyring.Delete(service, key); err != nil {
+		if err == gokeyring.ErrNotFound {
+			return &ErrNotFound{Key: key}
+		}
+		return fmt.Errorf("keystore delete %q: %w", key, err)
+	}
+	return nil
+}

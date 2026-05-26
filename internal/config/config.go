@@ -1,1 +1,48 @@
-cGFja2FnZSBjb25maWcKCmltcG9ydCAoCgkiZW5jb2RpbmcvanNvbiIKCSJmbXQiCgkib3MiCikKCi8vIFNlcnZpY2VDb25maWcgcmVwcmVzZW50cyBhIHNpbmdsZSBNQ1Agc2VydmVyIGNvbmZpZ3VyYXRpb24uCnR5cGUgU2VydmljZUNvbmZpZyBzdHJ1Y3QgewoJQ29tbWFuZCBzdHJpbmcgICAgICAgICAgICBganNvbjoiY29tbWFuZCJgCglBcmdzICAgIFtdc3RyaW5nICAgICAgICAgIGBqc29uOiJhcmdzImAKCUVudktleXMgbWFwW3N0cmluZ11zdHJpbmcgYGpzb246ImVudl9rZXlzImAKfQoKLy8gQ29uZmlnIGlzIHRoZSB0b3AtbGV2ZWwgbWFwIG9mIHNlcnZpY2UgbmFtZSAtPiBTZXJ2aWNlQ29uZmlnLgp0eXBlIENvbmZpZyBtYXBbc3RyaW5nXVNlcnZpY2VDb25maWcKCi8vIExvYWQgcmVhZHMgYW5kIHBhcnNlcyBhIGxhdW5jaGVyLmpzb24gZmlsZSBmcm9tIHRoZSBnaXZlbiBwYXRoLgpmdW5jIExvYWQocGF0aCBzdHJpbmcpIChDb25maWcsIGVycm9yKSB7CglmLCBlcnIgOj0gb3MuT3BlbihwYXRoKQoJaWYgZXJyICE9IG5pbCB7CgkJcmV0dXJuIG5pbCwgZm10LkVycm9yZigiY291bGQgbm90IG9wZW4gY29uZmlnIGZpbGUgJXE6ICV3IiwgcGF0aCwgZXJyKQoJfQoJZGVmZXIgZi5DbG9zZSgpCgoJdmFyIGNmZyBDb25maWcKCWRlYyA6PSBqc29uLk5ld0RlY29kZXIoZikKCWRlYy5EaXNhbGxvd1Vua25vd25GaWVsZHMoKQoJaWYgZXJyIDo9IGRlYy5EZWNvZGUoJmNmZyk7IGVyciAhPSBuaWwgewoJCXJldHVybiBuaWwsIGZtdC5FcnJvcmYoImNvdWxkIG5vdCBwYXJzZSBjb25maWcgZmlsZSAlcTogJXciLCBwYXRoLCBlcnIpCgl9CgoJaWYgZXJyIDo9IGNmZy52YWxpZGF0ZSgpOyBlcnIgIT0gbmlsIHsKCQlyZXR1cm4gbmlsLCBlcnIKCX0KCglyZXR1cm4gY2ZnLCBuaWwKfQoKLy8gdmFsaWRhdGUgY2hlY2tzIHRoYXQgZWFjaCBzZXJ2aWNlIGVudHJ5IGhhcyB0aGUgcmVxdWlyZWQgZmllbGRzLgpmdW5jIChjIENvbmZpZykgdmFsaWRhdGUoKSBlcnJvciB7Cglmb3IgbmFtZSwgc3ZjIDo9IHJhbmdlIGMgewoJCWlmIHN2Yy5Db21tYW5kID09ICIiIHsKCQkJcmV0dXJuIGZtdC5FcnJvcmYoInNlcnZpY2UgJXE6IG1pc3NpbmcgcmVxdWlyZWQgZmllbGQgJ2NvbW1hbmQnIiwgbmFtZSkKCQl9CgkJaWYgbGVuKHN2Yy5FbnZLZXlzKSA9PSAwIHsKCQkJcmV0dXJuIGZtdC5FcnJvcmYoInNlcnZpY2UgJXE6IG1pc3NpbmcgcmVxdWlyZWQgZmllbGQgJ2Vudl9rZXlzJyIsIG5hbWUpCgkJfQoJfQoJcmV0dXJuIG5pbAp9Cg==
+package config
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
+type ServiceConfig struct {
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	EnvKeys map[string]string `json:"env_keys"`
+}
+
+type Config map[string]ServiceConfig
+
+func Load(path string) (Config, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open config file %q: %w", path, err)
+	}
+	defer f.Close()
+
+	var cfg Config
+	dec := json.NewDecoder(f)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("could not parse config file %q: %w", path, err)
+	}
+
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func (c Config) validate() error {
+	for name, svc := range c {
+		if svc.Command == "" {
+			return fmt.Errorf("service %q: missing required field 'command'", name)
+		}
+		if len(svc.EnvKeys) == 0 {
+			return fmt.Errorf("service %q: missing required field 'env_keys'", name)
+		}
+	}
+	return nil
+}

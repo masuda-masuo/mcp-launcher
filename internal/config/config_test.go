@@ -1,1 +1,75 @@
-cGFja2FnZSBjb25maWcKCmltcG9ydCAoCgkib3MiCgkicGF0aC9maWxlcGF0aCIKCSJ0ZXN0aW5nIgopCgpmdW5jIFRlc3RMb2FkX1ZhbGlkQ29uZmlnKHQgKnRlc3RpbmcuVCkgewoJcGF0aCA6PSBmaWxlcGF0aC5Kb2luKCJ0ZXN0ZGF0YSIsICJ2YWxpZC5qc29uIikKCWNmZywgZXJyIDo9IExvYWQocGF0aCkKCWlmIGVyciAhPSBuaWwgewoJCXQuRmF0YWxmKCJleHBlY3RlZCBubyBlcnJvciwgZ290OiAldiIsIGVycikKCX0KCglzdmMsIG9rIDo9IGNmZ1siZ2l0aHViIl0KCWlmICFvayB7CgkJdC5GYXRhbCgiZXhwZWN0ZWQgJ2dpdGh1Yicgc2VydmljZSBpbiBjb25maWciKQoJfQoJaWYgc3ZjLkNvbW1hbmQgIT0gImdpdGh1Yi1tY3Atc2VydmVyIiB7CgkJdC5FcnJvcmYoImV4cGVjdGVkIGNvbW1hbmQgJ2dpdGh1Yi1tY3Atc2VydmVyJywgZ290ICVxIiwgc3ZjLkNvbW1hbmQpCgl9CglpZiBzdmMuRW52S2V5c1siR0lUSFVCX1RPS0VOIl0gIT0gIm1jcC1sYXVuY2hlci9naXRodWIiIHsKCQl0LkVycm9yZigidW5leHBlY3RlZCBlbnZfa2V5IHZhbHVlOiAlcSIsIHN2Yy5FbnZLZXlzWyJHSVRIVUJfVE9LRU4iXSkKCX0KfQoKZnVuYyBUZXN0TG9hZF9NdWx0aXBsZVNlcnZpY2VzKHQgKnRlc3RpbmcuVCkgewoJcGF0aCA6PSBmaWxlcGF0aC5Kb2luKCJ0ZXN0ZGF0YSIsICJ2YWxpZC5qc29uIikKCWNmZywgZXJyIDo9IExvYWQocGF0aCkKCWlmIGVyciAhPSBuaWwgewoJCXQuRmF0YWxmKCJ1bmV4cGVjdGVkIGVycm9yOiAldiIsIGVycikKCX0KCWlmIGxlbihjZmcpICE9IDIgewoJCXQuRXJyb3JmKCJleHBlY3RlZCAyIHNlcnZpY2VzLCBnb3QgJWQiLCBsZW4oY2ZnKSkKCX0KfQoKZnVuYyBUZXN0TG9hZF9NaXNzaW5nRmlsZSh0ICp0ZXN0aW5nLlQpIHsKCV8sIGVyciA6PSBMb2FkKCJub25leGlzdGVudC5qc29uIikKCWlmIGVyciA9PSBuaWwgewoJCXQuRmF0YWwoImV4cGVjdGVkIGVycm9yIGZvciBtaXNzaW5nIGZpbGUsIGdvdCBuaWwiKQoJfQp9CgpmdW5jIFRlc3RMb2FkX01pc3NpbmdDb21tYW5kKHQgKnRlc3RpbmcuVCkgewoJcGF0aCA6PSBmaWxlcGF0aC5Kb2luKCJ0ZXN0ZGF0YSIsICJtaXNzaW5nX2NvbW1hbmQuanNvbiIpCglfLCBlcnIgOj0gTG9hZChwYXRoKQoJaWYgZXJyID09IG5pbCB7CgkJdC5GYXRhbCgiZXhwZWN0ZWQgdmFsaWRhdGlvbiBlcnJvciBmb3IgbWlzc2luZyBjb21tYW5kLCBnb3QgbmlsIikKCX0KfQoKZnVuYyBUZXN0TG9hZF9NaXNzaW5nRW52S2V5cyh0ICp0ZXN0aW5nLlQpIHsKCXBhdGggOj0gZmlsZXBhdGguSm9pbigidGVzdGRhdGEiLCAibWlzc2luZ19lbnZfa2V5cy5qc29uIikKCV8sIGVyciA6PSBMb2FkKHBhdGgpCglpZiBlcnIgPT0gbmlsIHsKCQl0LkZhdGFsKCJleHBlY3RlZCB2YWxpZGF0aW9uIGVycm9yIGZvciBtaXNzaW5nIGVudl9rZXlzLCBnb3QgbmlsIikKCX0KfQoKZnVuYyBUZXN0TG9hZF9JbnZhbGlkSlNPTih0ICp0ZXN0aW5nLlQpIHsKCWYsIGVyciA6PSBvcy5DcmVhdGVUZW1wKCIiLCAibGF1bmNoZXItKi5qc29uIikKCWlmIGVyciAhPSBuaWwgewoJCXQuRmF0YWwoZXJyKQoJfQoJZGVmZXIgb3MuUmVtb3ZlKGYuTmFtZSgpKQoJZi5Xcml0ZVN0cmluZygie2ludmFsaWQganNvbn0iKQoJZi5DbG9zZSgpCgoJXywgZXJyID0gTG9hZChmLk5hbWUoKSkKCWlmIGVyciA9PSBuaWwgewoJCXQuRmF0YWwoImV4cGVjdGVkIGVycm9yIGZvciBpbnZhbGlkIEpTT04sIGdvdCBuaWwiKQoJfQp9Cg==
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestLoad_ValidConfig(t *testing.T) {
+	path := filepath.Join("testdata", "valid.json")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	svc, ok := cfg["github"]
+	if !ok {
+		t.Fatal("expected 'github' service in config")
+	}
+	if svc.Command != "github-mcp-server" {
+		t.Errorf("expected command 'github-mcp-server', got %q", svc.Command)
+	}
+	if svc.EnvKeys["GITHUB_TOKEN"] != "mcp-launcher/github" {
+		t.Errorf("unexpected env_key value: %q", svc.EnvKeys["GITHUB_TOKEN"])
+	}
+}
+
+func TestLoad_MultipleServices(t *testing.T) {
+	path := filepath.Join("testdata", "valid.json")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg) != 2 {
+		t.Errorf("expected 2 services, got %d", len(cfg))
+	}
+}
+
+func TestLoad_MissingFile(t *testing.T) {
+	_, err := Load("nonexistent.json")
+	if err == nil {
+		t.Fatal("expected error for missing file, got nil")
+	}
+}
+
+func TestLoad_MissingCommand(t *testing.T) {
+	path := filepath.Join("testdata", "missing_command.json")
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error for missing command, got nil")
+	}
+}
+
+func TestLoad_MissingEnvKeys(t *testing.T) {
+	path := filepath.Join("testdata", "missing_env_keys.json")
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected validation error for missing env_keys, got nil")
+	}
+}
+
+func TestLoad_InvalidJSON(t *testing.T) {
+	f, err := os.CreateTemp("", "launcher-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	f.WriteString("{invalid json}")
+	f.Close()
+
+	_, err = Load(f.Name())
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+}

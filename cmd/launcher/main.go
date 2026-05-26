@@ -1,1 +1,105 @@
-cGFja2FnZSBtYWluCgppbXBvcnQgKAoJImZtdCIKCSJvcyIKCSJvcy9leGVjIgoKCSJnaXRodWIuY29tL21hc3VkYS1tYXN1by9tY3AtbGF1bmNoZXIvaW50ZXJuYWwvY29uZmlnIgoJImdpdGh1Yi5jb20vbWFzdWRhLW1hc3VvL21jcC1sYXVuY2hlci9pbnRlcm5hbC9rZXlzdG9yZSIKKQoKY29uc3QgZGVmYXVsdENvbmZpZ1BhdGggPSAibGF1bmNoZXIuanNvbiIKCmZ1bmMgbWFpbigpIHsKCWlmIGxlbihvcy5BcmdzKSA8IDIgewoJCWZtdC5GcHJpbnRmKG9zLlN0ZGVyciwgIlVzYWdlOiBtY3AtbGF1bmNoZXIgPHNlcnZpY2U+XG4iKQoJCWZtdC5GcHJpbnRmKG9zLlN0ZGVyciwgIiAgICAgICBtY3AtbGF1bmNoZXIgcmVnaXN0ZXIgPHNlcnZpY2U+IDxFTlZfS0VZPiA8dmFsdWU+XG4iKQoJCW9zLkV4aXQoMSkKCX0KCglzd2l0Y2ggb3MuQXJnc1sxXSB7CgljYXNlICJyZWdpc3RlciI6CgkJaWYgZXJyIDo9IHJ1blJlZ2lzdGVyKG9zLkFyZ3NbMjpdKTsgZXJyICE9IG5pbCB7CgkJCWZtdC5GcHJpbnRmKG9zLlN0ZGVyciwgImVycm9yOiAldlxuIiwgZXJyKQoJCQlvcy5FeGl0KDEpCgkJfQoJZGVmYXVsdDoKCQlpZiBlcnIgOj0gcnVuTGF1bmNoKG9zLkFyZ3NbMV0pOyBlcnIgIT0gbmlsIHsKCQkJZm10LkZwcmludGYob3MuU3RkZXJyLCAiZXJyb3I6ICV2XG4iLCBlcnIpCgkJCW9zLkV4aXQoMSkKCQl9Cgl9Cn0KCi8vIHJ1bkxhdW5jaCBmZXRjaGVzIHNlY3JldHMgYW5kIGxhdW5jaGVzIHRoZSBNQ1Agc2VydmVyIGZvciB0aGUgZ2l2ZW4gc2VydmljZS4KZnVuYyBydW5MYXVuY2goc2VydmljZU5hbWUgc3RyaW5nKSBlcnJvciB7Cgljb25maWdQYXRoIDo9IGNvbmZpZ0ZpbGVQYXRoKCkKCgljZmcsIGVyciA6PSBjb25maWcuTG9hZChjb25maWdQYXRoKQoJaWYgZXJyICE9IG5pbCB7CgkJcmV0dXJuIGZtdC5FcnJvcmYoImxvYWRpbmcgY29uZmlnOiAldyIsIGVycikKCX0KCglzdmMsIG9rIDo9IGNmZ1tzZXJ2aWNlTmFtZV0KCWlmICFvayB7CgkJcmV0dXJuIGZtdC5FcnJvcmYoInNlcnZpY2UgJXEgbm90IGZvdW5kIGluICVzIiwgc2VydmljZU5hbWUsIGNvbmZpZ1BhdGgpCgl9CgoJc3RvcmUsIGVyciA6PSBrZXlzdG9yZS5OZXdPU1N0b3JlKCkKCWlmIGVyciAhPSBuaWwgewoJCXJldHVybiBmbXQuRXJyb3JmKCJpbml0aWFsaXppbmcga2V5c3RvcmU6ICV3IiwgZXJyKQoJfQoKCWVudiA6PSBvcy5FbnZpcm9uKCkKCWZvciBlbnZLZXksIHN0b3JlS2V5IDo9IHJhbmdlIHN2Yy5FbnZLZXlzIHsKCQl2YWx1ZSwgZXJyIDo9IHN0b3JlLkdldChzdG9yZUtleSkKCQlpZiBlcnIgIT0gbmlsIHsKCQkJaWYga2V5c3RvcmUuSXNOb3RGb3VuZChlcnIpIHsKCQkJCXJldHVybiBmbXQuRXJyb3JmKAoJCQkJCSJzZWNyZXQgJXEgbm90IGZvdW5kIGluIGtleXN0b3JlIOKAlCBydW46IG1jcC1sYXVuY2hlciByZWdpc3RlciAlcyAlcyA8dmFsdWU+IiwKCQkJCQlzdG9yZUtleSwgc2VydmljZU5hbWUsIGVudktleSwKCQkJCSkKCQkJfQoJCQlyZXR1cm4gZm10LkVycm9yZigicmV0cmlldmluZyBzZWNyZXQgJXE6ICV3Iiwgc3RvcmVLZXksIGVycikKCQl9CgkJZW52ID0gYXBwZW5kKGVudiwgZW52S2V5KyI9Iit2YWx1ZSkKCX0KCglhcmdzIDo9IGFwcGVuZChbXXN0cmluZ3tzdmMuQ29tbWFuZH0sIHN2Yy5BcmdzLi4uKQoJY21kIDo9IGV4ZWMuQ29tbWFuZChhcmdzWzBdLCBhcmdzWzE6XS4uLikKCWNtZC5FbnYgPSBlbnYKCWNtZC5TdGRpbiA9IG9zLlN0ZGluCgljbWQuU3Rkb3V0ID0gb3MuU3Rkb3V0CgljbWQuU3RkZXJyID0gb3MuU3RkZXJyCgoJcmV0dXJuIGNtZC5SdW4oKQp9CgovLyBydW5SZWdpc3RlciBzdG9yZXMgYSBzZWNyZXQgaW4gdGhlIE9TIGtleXN0b3JlLgpmdW5jIHJ1blJlZ2lzdGVyKGFyZ3MgW11zdHJpbmcpIGVycm9yIHsKCWlmIGxlbihhcmdzKSAhPSAzIHsKCQlyZXR1cm4gZm10LkVycm9yZigidXNhZ2U6IG1jcC1sYXVuY2hlciByZWdpc3RlciA8c2VydmljZT4gPEVOVl9LRVk+IDx2YWx1ZT4iKQoJfQoJc2VydmljZSwgZW52S2V5LCB2YWx1ZSA6PSBhcmdzWzBdLCBhcmdzWzFdLCBhcmdzWzJdCglzdG9yZUtleSA6PSAibWNwLWxhdW5jaGVyLyIgKyBzZXJ2aWNlICsgIi8iICsgZW52S2V5CgoJc3RvcmUsIGVyciA6PSBrZXlzdG9yZS5OZXdPU1N0b3JlKCkKCWlmIGVyciAhPSBuaWwgewoJCXJldHVybiBmbXQuRXJyb3JmKCJpbml0aWFsaXppbmcga2V5c3RvcmU6ICV3IiwgZXJyKQoJfQoKCWlmIGVyciA6PSBzdG9yZS5TZXQoc3RvcmVLZXksIHZhbHVlKTsgZXJyICE9IG5pbCB7CgkJcmV0dXJuIGZtdC5FcnJvcmYoInN0b3Jpbmcgc2VjcmV0OiAldyIsIGVycikKCX0KCglmbXQuUHJpbnRmKCLinJMgUmVnaXN0ZXJlZCAlcyDihpIga2V5c3RvcmUga2V5OiAlcVxuIiwgZW52S2V5LCBzdG9yZUtleSkKCWZtdC5QcmludGYoIiAgQWRkIHRvIGxhdW5jaGVyLmpzb24gdW5kZXIgc2VydmljZSAlcTpcbiIsIHNlcnZpY2UpCglmbXQuUHJpbnRmKCIgIFwiZW52X2tleXNcIjogeyAlcTogJXEgfVxuIiwgZW52S2V5LCBzdG9yZUtleSkKCXJldHVybiBuaWwKfQoKZnVuYyBjb25maWdGaWxlUGF0aCgpIHN0cmluZyB7CglpZiBwIDo9IG9zLkdldGVudigiTUNQX0xBVU5DSEVSX0NPTkZJRyIpOyBwICE9ICIiIHsKCQlyZXR1cm4gcAoJfQoJcmV0dXJuIGRlZmF1bHRDb25maWdQYXRoCn0K
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+
+	"github.com/masuda-masuo/mcp-launcher/internal/config"
+	"github.com/masuda-masuo/mcp-launcher/internal/keystore"
+)
+
+const defaultConfigPath = "launcher.json"
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Fprintf(os.Stderr, "Usage: mcp-launcher <service>\n")
+		fmt.Fprintf(os.Stderr, "       mcp-launcher register <service> <ENV_KEY> <value>\n")
+		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case "register":
+		if err := runRegister(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		if err := runLaunch(os.Args[1]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
+func runLaunch(serviceName string) error {
+	configPath := configFilePath()
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	svc, ok := cfg[serviceName]
+	if !ok {
+		return fmt.Errorf("service %q not found in %s", serviceName, configPath)
+	}
+
+	store, err := keystore.NewOSStore()
+	if err != nil {
+		return fmt.Errorf("initializing keystore: %w", err)
+	}
+
+	env := os.Environ()
+	for envKey, storeKey := range svc.EnvKeys {
+		value, err := store.Get(storeKey)
+		if err != nil {
+			if keystore.IsNotFound(err) {
+				return fmt.Errorf(
+					"secret %q not found in keystore — run: mcp-launcher register %s %s <value>",
+					storeKey, serviceName, envKey,
+				)
+			}
+			return fmt.Errorf("retrieving secret %q: %w", storeKey, err)
+		}
+		env = append(env, envKey+"="+value)
+	}
+
+	args := append([]string{svc.Command}, svc.Args...)
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Env = env
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func runRegister(args []string) error {
+	if len(args) != 3 {
+		return fmt.Errorf("usage: mcp-launcher register <service> <ENV_KEY> <value>")
+	}
+	service, envKey, value := args[0], args[1], args[2]
+	storeKey := "mcp-launcher/" + service + "/" + envKey
+
+	store, err := keystore.NewOSStore()
+	if err != nil {
+		return fmt.Errorf("initializing keystore: %w", err)
+	}
+
+	if err := store.Set(storeKey, value); err != nil {
+		return fmt.Errorf("storing secret: %w", err)
+	}
+
+	fmt.Printf("\u2713 Registered %s \u2192 keystore key: %q\n", envKey, storeKey)
+	fmt.Printf("  Add to launcher.json under service %q:\n", service)
+	fmt.Printf("  \"env_keys\": { %q: %q }\n", envKey, storeKey)
+	return nil
+}
+
+func configFilePath() string {
+	if p := os.Getenv("MCP_LAUNCHER_CONFIG"); p != "" {
+		return p
+	}
+	return defaultConfigPath
+}
