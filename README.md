@@ -92,14 +92,14 @@ The token lives only in the child process's environment. It never touches a file
   "github": {
     "command": "github-mcp-server",
     "env_keys": {
-      "GITHUB_TOKEN": "mcp-launcher/github"
+      "GITHUB_TOKEN": "mcp-launcher/github/GITHUB_TOKEN"
     }
   },
   "aws": {
     "command": "aws-mcp-server",
     "env_keys": {
-      "AWS_ACCESS_KEY_ID": "mcp-launcher/aws-key",
-      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/aws-secret"
+      "AWS_ACCESS_KEY_ID": "mcp-launcher/aws/AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/aws/AWS_SECRET_ACCESS_KEY"
     }
   }
 }
