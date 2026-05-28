@@ -6,10 +6,20 @@ import (
 	"os"
 )
 
+type TokenSource struct {
+	Type                 string `json:"type"`
+	AppIDKey             string `json:"app_id_key"`
+	PrivateKeyKey        string `json:"private_key_key"`
+	InstallationIDKey    string `json:"installation_id_key"`
+	TargetEnvKey         string `json:"target_env_key"`
+	RefreshBeforeSeconds int    `json:"refresh_before_seconds"`
+}
+
 type ServiceConfig struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	EnvKeys map[string]string `json:"env_keys"`
+	Command     string            `json:"command"`
+	Args        []string          `json:"args"`
+	EnvKeys     map[string]string `json:"env_keys"`
+	TokenSource *TokenSource      `json:"token_source,omitempty"`
 }
 
 type Config map[string]ServiceConfig
