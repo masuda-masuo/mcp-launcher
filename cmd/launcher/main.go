@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 
 	"github.com/masuda-masuo/mcp-launcher/internal/config"
 	"github.com/masuda-masuo/mcp-launcher/internal/keystore"
+	"github.com/masuda-masuo/mcp-launcher/internal/refresher"
 )
 
 const defaultConfigPath = "launcher.json"
@@ -48,6 +50,23 @@ func runLaunch(serviceName string) error {
 	store, err := keystore.NewOSStore()
 	if err != nil {
 		return fmt.Errorf("initializing keystore: %w", err)
+	}
+
+	// Phase 2: Token refresh before launch
+	if svc.TokenSource != nil {
+		tokenKey, ok := svc.EnvKeys[svc.TokenSource.TargetEnvKey]
+		if !ok {
+			return fmt.Errorf(
+				"token_source.target_env_key %q not found in env_keys for service %q",
+				svc.TokenSource.TargetEnvKey, serviceName,
+			)
+		}
+
+		r := refresher.New(store, *svc.TokenSource, tokenKey)
+		if err := r.RunOnce(context.Background()); err != nil {
+			// Log warning but continue with existing token (fail-open)
+			fmt.Fprintf(os.Stderr, "warning: token refresh failed: %v (continuing with existing token)\n", err)
+		}
 	}
 
 	env := os.Environ()
