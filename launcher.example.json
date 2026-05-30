@@ -1,9 +1,9 @@
 {
   "github": {
-    "command": "github-mcp-server",
-    "args": ["--stdio"],
+    "command": "C:\\path\\to\\github-mcp-server.exe",
+    "args": ["stdio"],
     "env_keys": {
-      "GITHUB_TOKEN": "mcp-launcher/github/GITHUB_TOKEN"
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
     }
   },
   "aws": {
