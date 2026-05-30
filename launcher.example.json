@@ -1,16 +1,16 @@
 {
   "github": {
-    "command": "github-mcp-server",
-    "args": ["--stdio"],
+    "command": "C:\\path\\to\\github-mcp-server.exe",
+    "args": ["stdio"],
     "env_keys": {
-      "GITHUB_TOKEN": "mcp-launcher/github/GITHUB_TOKEN"
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
     },
     "token_source": {
       "type": "github_app",
       "app_id_key": "mcp-launcher/github/APP_ID",
       "private_key_key": "mcp-launcher/github/PRIVATE_KEY",
       "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
-      "target_env_key": "GITHUB_TOKEN",
+      "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
     }
   },
