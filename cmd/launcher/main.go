@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/masuda-masuo/mcp-launcher/internal/config"
 	"github.com/masuda-masuo/mcp-launcher/internal/keystore"
@@ -84,6 +85,16 @@ func runLaunch(serviceName string) error {
 		env = append(env, envKey+"="+value)
 	}
 
+	// Phase 2: Child process restart loop
+	if svc.RestartIntervalSeconds > 0 {
+		return runChildWithRestart(context.Background(), svc, env, store)
+	}
+
+	// Single run (default)
+	return runChildOnce(svc, env)
+}
+
+func runChildOnce(svc config.ServiceConfig, env []string) error {
 	args := append([]string{svc.Command}, svc.Args...)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Env = env
@@ -92,6 +103,56 @@ func runLaunch(serviceName string) error {
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, env []string, store keystore.Store) error {
+	interval := time.Duration(svc.RestartIntervalSeconds) * time.Second
+
+	for {
+		args := append([]string{svc.Command}, svc.Args...)
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Env = env
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("starting child process: %w", err)
+		}
+
+		waitDone := make(chan error, 1)
+		go func() {
+			waitDone <- cmd.Wait()
+		}()
+
+		select {
+		case err := <-waitDone:
+			// Child exited on its own — restart immediately
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: child process exited with error: %v (restarting)\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "info: child process exited (restarting)\n")
+			}
+		case <-time.After(interval):
+			// Restart interval reached — kill and restart
+			if err := cmd.Process.Kill(); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to kill child process: %v\n", err)
+			}
+			<-waitDone
+			fmt.Fprintf(os.Stderr, "info: restart interval reached, restarting child process\n")
+		}
+
+		// Refresh token before restart
+		if svc.TokenSource != nil {
+			tokenKey, ok := svc.EnvKeys[svc.TokenSource.TargetEnvKey]
+			if ok {
+				r := refresher.New(store, *svc.TokenSource, tokenKey)
+				if err := r.RunOnce(ctx); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: token refresh failed: %v (continuing)\n", err)
+				}
+			}
+		}
+	}
 }
 
 func runRegister(args []string) error {
