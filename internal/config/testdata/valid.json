@@ -4,7 +4,8 @@
     "args": ["--stdio"],
     "env_keys": {
       "GITHUB_TOKEN": "mcp-launcher/github/GITHUB_TOKEN"
-    }
+    },
+    "restart_interval_seconds": 60
   },
   "aws": {
     "command": "aws-mcp-server",

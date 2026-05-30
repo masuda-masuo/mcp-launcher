@@ -14,6 +14,7 @@
       "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
       "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
-    }
+    },
+    "restart_interval_seconds": 60
   }
 }
