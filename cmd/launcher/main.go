@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"time"
 
 	"github.com/masuda-masuo/mcp-launcher/internal/config"
@@ -70,28 +71,38 @@ func runLaunch(serviceName string) error {
 		}
 	}
 
+	// Phase 2: Child process restart loop
+	if svc.RestartIntervalSeconds > 0 {
+		// Use signal.NotifyContext so Ctrl+C / SIGTERM triggers graceful shutdown
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+		defer stop()
+		return runChildWithRestart(ctx, svc, store, serviceName)
+	}
+
+	// Single run (default)
+	env, err := buildEnv(svc, store, serviceName)
+	if err != nil {
+		return err
+	}
+	return runChildOnce(svc, env)
+}
+
+func buildEnv(svc config.ServiceConfig, store keystore.Store, serviceName string) ([]string, error) {
 	env := os.Environ()
 	for envKey, storeKey := range svc.EnvKeys {
 		value, err := store.Get(storeKey)
 		if err != nil {
 			if keystore.IsNotFound(err) {
-				return fmt.Errorf(
+				return nil, fmt.Errorf(
 					"secret %q not found in keystore — run: mcp-launcher register %s %s <value>",
 					storeKey, serviceName, envKey,
 				)
 			}
-			return fmt.Errorf("retrieving secret %q: %w", storeKey, err)
+			return nil, fmt.Errorf("retrieving secret %q: %w", storeKey, err)
 		}
 		env = append(env, envKey+"="+value)
 	}
-
-	// Phase 2: Child process restart loop
-	if svc.RestartIntervalSeconds > 0 {
-		return runChildWithRestart(context.Background(), svc, env, store)
-	}
-
-	// Single run (default)
-	return runChildOnce(svc, env)
+	return env, nil
 }
 
 func runChildOnce(svc config.ServiceConfig, env []string) error {
@@ -105,13 +116,20 @@ func runChildOnce(svc config.ServiceConfig, env []string) error {
 	return cmd.Run()
 }
 
-func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, env []string, store keystore.Store) error {
+func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store keystore.Store, serviceName string) error {
 	interval := time.Duration(svc.RestartIntervalSeconds) * time.Second
+	const backoff = 500 * time.Millisecond
 
 	for {
+		// Rebuild env to pick up refreshed tokens from keystore
+		currentEnv, err := buildEnv(svc, store, serviceName)
+		if err != nil {
+			return fmt.Errorf("building env: %w", err)
+		}
+
 		args := append([]string{svc.Command}, svc.Args...)
 		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Env = env
+		cmd.Env = currentEnv
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -126,13 +144,27 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, env []st
 		}()
 
 		select {
-		case err := <-waitDone:
-			// Child exited on its own — restart immediately
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "warning: child process exited with error: %v (restarting)\n", err)
-			} else {
-				fmt.Fprintf(os.Stderr, "info: child process exited (restarting)\n")
+		case <-ctx.Done():
+			// Graceful shutdown: try graceful stop first, then force kill
+			_ = cmd.Process.Signal(os.Interrupt)
+			select {
+			case <-waitDone:
+			case <-time.After(5 * time.Second):
+				_ = cmd.Process.Kill()
+				<-waitDone
 			}
+			fmt.Fprintf(os.Stderr, "info: mcp-launcher shutting down\n")
+			return ctx.Err()
+
+		case err := <-waitDone:
+			// Child exited on its own — restart with backoff to prevent tight loop
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: child process exited with error: %v (restarting after backoff)\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "info: child process exited (restarting after backoff)\n")
+			}
+			time.Sleep(backoff)
+
 		case <-time.After(interval):
 			// Restart interval reached — kill and restart
 			if err := cmd.Process.Kill(); err != nil {
