@@ -1,7 +1,9 @@
 {
   "github": {
     "command": "C:\\path\\to\\github-mcp-server.exe",
-    "args": ["stdio"],
+    "args": [
+      "stdio"
+    ],
     "env_keys": {
       "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
     },
@@ -12,13 +14,6 @@
       "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
       "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
-    }
-  },
-  "aws": {
-    "command": "aws-mcp-server",
-    "env_keys": {
-      "AWS_ACCESS_KEY_ID": "mcp-launcher/aws/AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/aws/AWS_SECRET_ACCESS_KEY"
     }
   }
 }

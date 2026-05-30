@@ -2,6 +2,8 @@ module github.com/masuda-masuo/mcp-launcher
 
 go 1.22.2
 
+require github.com/zalando/go-keyring v0.2.8
+
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/zalando/go-keyring v0.2.8

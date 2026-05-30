@@ -13,7 +13,7 @@ When using MCP servers with AI tools like Claude Desktop or TypingMind, you're t
   "mcpServers": {
     "github": {
       "env": {
-        "GITHUB_TOKEN": "ghp_xxxxxxxxxxxx"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxxxxxxxxx"
       }
     }
   }
@@ -76,7 +76,7 @@ mcp-launcher github
     ↓
 Reads launcher.json → finds "github" config
     ↓
-Fetches GITHUB_TOKEN from OS keystore (Credential Manager / Keychain / libsecret)
+Fetches GITHUB_PERSONAL_ACCESS_TOKEN from OS keystore (Credential Manager / Keychain / libsecret)
     ↓
 Sets env variables
     ↓
@@ -90,9 +90,10 @@ The token lives only in the child process's environment. It never touches a file
 ```json
 {
   "github": {
-    "command": "github-mcp-server",
+    "command": "C:\\path\\to\\github-mcp-server.exe",
+    "args": ["stdio"],
     "env_keys": {
-      "GITHUB_TOKEN": "mcp-launcher/github/GITHUB_TOKEN"
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
     }
   },
   "aws": {
@@ -132,10 +133,19 @@ cd mcp-launcher
 go build -o mcp-launcher ./cmd/launcher
 ```
 
+### Set up the GitHub MCP Server
+
+Download the official GitHub MCP Server binary from:
+https://github.com/github/github-mcp-server/releases
+
+> **Note**: The npm package `@modelcontextprotocol/server-github` is deprecated as of April 2025. Use the official binary above instead.
+
+> **Note (Windows)**: Claude Desktop does not inherit the system PATH, so you must use the full absolute path to `github-mcp-server.exe` in your `launcher.json`.
+
 ### Register a secret
 
 ```bash
-mcp-launcher register github GITHUB_TOKEN ghp_yourtoken
+mcp-launcher register github GITHUB_PERSONAL_ACCESS_TOKEN ghp_yourtoken
 ```
 
 This stores the token in your OS keystore. You can then delete it from any config files.
