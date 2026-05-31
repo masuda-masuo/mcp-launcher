@@ -201,7 +201,7 @@ mcp-launcher register github GITHUB_PERSONAL_ACCESS_TOKEN ghp_yourtoken
 
 ## Phase 2: Short-lived Tokens via GitHub App
 
-Phase 2 replaces the long-lived Personal Access Token with short-lived installation access tokens (max 1 hour) issued by a GitHub App. The token is automatically refreshed on each launch.
+Phase 2 replaces the long-lived Personal Access Token with short-lived installation access tokens (max 1 hour) issued by a GitHub App. The token is automatically refreshed when it approaches expiry.
 
 ### Step 1: Create a GitHub App
 
@@ -254,27 +254,30 @@ mcp-launcher register github INSTALLATION_ID 7654321
       "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
       "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
-    }
+    },
+    "check_interval_seconds": 60
   }
 }
 ```
 
-`refresh_before_seconds: 600` means the token will be refreshed if it expires within 10 minutes of the next launch.
+`refresh_before_seconds: 600` means the token will be refreshed if it expires within 10 minutes.
+
+`check_interval_seconds: 60` is the polling interval for checking whether a token refresh is needed. A restart only occurs when the token is actually near expiry — this value is **not** a "restart every N seconds" setting.
 
 ### How token refresh works
 
 - Token is fetched from GitHub App API and stored in the keystore on first launch
-- On each subsequent launch, mcp-launcher checks the expiry
-- If the token is still valid, it is reused (no API call)
-- If expired or expiring soon, a new token is fetched automatically
-- If the refresh fails (e.g. no network), mcp-launcher falls back to the existing token and logs a warning — it does not stop
+- `check_interval_seconds` controls how often mcp-launcher checks the token expiry (default: no polling)
+- If the token is still valid, nothing happens (no API call, no restart)
+- If expiring soon (within `refresh_before_seconds`), a new token is fetched and the child process is restarted transparently
+- The restart is idle-gated: mcp-launcher waits for any in-flight requests to complete before restarting
+- If the refresh fails (e.g. no network), mcp-launcher logs a warning and continues with the existing token
 
 > **Note**: The access token may be expired if you haven't used Claude Desktop for more than 1 hour. It will be refreshed automatically on the next launch — no manual action required.
 
 ### Current limitations
 
 - **GitHub only**: Phase 2 token rotation is implemented for GitHub App only. Other services (AWS, Azure, GCP) use static secrets via Phase 1 for now.
-- **No background refresh**: The token is only refreshed at launch time. If a session runs longer than 1 hour, the token used by the MCP server will expire mid-session. The MCP server itself does not re-request a token.
 - **Private key security**: The GitHub App private key is stored in the OS keystore, which is more secure than a file, but it is a long-lived credential. If compromised, revoke it immediately from your GitHub App settings.
 
 ---
