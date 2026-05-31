@@ -21,6 +21,7 @@ type ServiceConfig struct {
 	EnvKeys                map[string]string `json:"env_keys"`
 	TokenSource            *TokenSource      `json:"token_source,omitempty"`
 	RestartIntervalSeconds int               `json:"restart_interval_seconds,omitempty"`
+	DrainTimeoutSeconds    int               `json:"drain_timeout_seconds,omitempty"`
 }
 
 type Config map[string]ServiceConfig
