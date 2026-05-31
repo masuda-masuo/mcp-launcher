@@ -16,12 +16,12 @@ type TokenSource struct {
 }
 
 type ServiceConfig struct {
-	Command                string            `json:"command"`
-	Args                   []string          `json:"args"`
-	EnvKeys                map[string]string `json:"env_keys"`
-	TokenSource            *TokenSource      `json:"token_source,omitempty"`
-	RestartIntervalSeconds int               `json:"restart_interval_seconds,omitempty"`
-	DrainTimeoutSeconds    int               `json:"drain_timeout_seconds,omitempty"`
+	Command               string            `json:"command"`
+	Args                  []string          `json:"args"`
+	EnvKeys               map[string]string `json:"env_keys"`
+	TokenSource           *TokenSource      `json:"token_source,omitempty"`
+	CheckIntervalSeconds  int               `json:"check_interval_seconds,omitempty"`
+	DrainTimeoutSeconds   int               `json:"drain_timeout_seconds,omitempty"`
 }
 
 type Config map[string]ServiceConfig
