@@ -110,14 +110,29 @@ Injects into env → starts github-mcp-server
 
 ### What is stored where
 
-| Secret | Storage | Visible to MCP server |
-|---|---|---|
-| GitHub App ID | OS keystore | ❌ No |
-| GitHub App private key (RSA) | OS keystore | ❌ No |
-| Installation ID | OS keystore | ❌ No |
-| Access token (max 1h) | OS keystore (refreshed automatically) | ✅ Yes |
+| Secret | Storage | Visible to MCP server | Visible to Claude (LLM) |
+|---|---|---|---|
+| GitHub App ID | OS keystore | ❌ No | ❌ No |
+| GitHub App private key (RSA) | OS keystore | ❌ No | ❌ No |
+| Installation ID | OS keystore | ❌ No | ❌ No |
+| Access token (max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly |
 
-The App ID, private key, and Installation ID are registered manually once via the CLI. They are never written to any file and never passed to the MCP server process.
+The App ID, private key, and Installation ID are registered once via the CLI and never leave the keystore. They are never passed to the MCP server process and never appear in any channel that Claude can read.
+
+The access token is injected into the child process environment. A trusted MCP server (such as the official GitHub MCP Server) uses it only to call the GitHub API and never exposes it in tool responses. Claude has no direct way to read environment variables — it can only observe what MCP tool responses return.
+
+### Why short-lived tokens matter
+
+A prompt injection attack — where malicious content in a web page or file tricks Claude into leaking information — can at most reach what Claude can see: MCP tool responses. It cannot reach the OS keystore.
+
+| Credential | Exposure via prompt injection | Impact if leaked | Expiry |
+|---|---|---|---|
+| Private key | ❌ Not reachable | 🔴 High — can mint tokens indefinitely | Never (revoke manually) |
+| Access token | ⚠️ Reachable via MCP tool responses | 🟡 Limited — usable for at most 1 hour | Max 1 hour |
+
+This is why the GitHub App model is preferred over long-lived PATs: even in the worst case where an access token is observed by Claude or leaked via a tool response, it expires within an hour and cannot be used to generate further tokens.
+
+The private key never enters any channel Claude can access, so it is not a prompt injection target. If it were compromised it would require OS-level access — a fundamentally different and much harder attack. Still, treat it as a long-lived credential: store it only in the keystore, never in a file, and revoke it immediately from your GitHub App settings if you suspect compromise.
 
 ### What this protects against
 
@@ -126,6 +141,7 @@ The App ID, private key, and Installation ID are registered manually once via th
 - ✅ API keys leaking into AI chat logs
 - ✅ Key sprawl across multiple tools and config locations
 - ✅ Long-lived token exposure — even if the MCP server leaks the token, it expires within 1 hour
+- ✅ Private key and App credentials reaching Claude or any MCP server
 
 ### What this does NOT protect against
 
@@ -260,10 +276,6 @@ mcp-launcher register github INSTALLATION_ID 7654321
 }
 ```
 
-`refresh_before_seconds: 600` means the token will be refreshed if it expires within 10 minutes.
-
-`check_interval_seconds: 60` is the polling interval for checking whether a token refresh is needed. A restart only occurs when the token is actually near expiry — this value is **not** a "restart every N seconds" setting.
-
 ### How token refresh works
 
 - Token is fetched from GitHub App API and stored in the keystore on first launch
@@ -279,6 +291,34 @@ mcp-launcher register github INSTALLATION_ID 7654321
 
 - **GitHub only**: Phase 2 token rotation is implemented for GitHub App only. Other services (AWS, Azure, GCP) use static secrets via Phase 1 for now.
 - **Private key security**: The GitHub App private key is stored in the OS keystore, which is more secure than a file, but it is a long-lived credential. If compromised, revoke it immediately from your GitHub App settings.
+
+---
+
+## Configuration Reference
+
+### Service config (`launcher.json`)
+
+| Field | Required | Type | Description |
+|---|---|---|---|
+| `command` | ✅ | string | Full path to the MCP server executable |
+| `args` | - | string[] | Command-line arguments passed to the MCP server |
+| `env_keys` | ✅ | object | Map of `ENV_VAR_NAME` → keystore key. Each entry is fetched from the OS keystore and injected into the child process environment |
+| `token_source` | - | object | GitHub App token configuration. When set, mcp-launcher fetches and refreshes short-lived tokens automatically |
+| `check_interval_seconds` | - | int | How often (in seconds) to check whether the token needs refreshing. A restart only occurs when the token is actually near expiry — this is **not** "restart every N seconds". Omit to disable background checking (token is only refreshed at launch) |
+| `drain_timeout_seconds` | - | int | Maximum time (in seconds) to wait for in-flight requests to complete before forcing a restart. Zero or omitted means wait indefinitely |
+
+### `token_source` fields
+
+| Field | Required | Description |
+|---|---|---|
+| `type` | ✅ | Token source type. Currently only `"github_app"` is supported |
+| `app_id_key` | ✅ | Keystore key where the GitHub App ID is stored |
+| `private_key_key` | ✅ | Keystore key where the GitHub App RSA private key (PEM) is stored |
+| `installation_id_key` | ✅ | Keystore key where the GitHub App Installation ID is stored |
+| `target_env_key` | ✅ | The `env_keys` entry that will receive the generated access token (e.g. `"GITHUB_PERSONAL_ACCESS_TOKEN"`) |
+| `refresh_before_seconds` | ✅ | Refresh the token when its remaining lifetime falls below this threshold (in seconds). Recommended: `600` (10 minutes) |
+
+> **Security note**: `app_id_key`, `private_key_key`, and `installation_id_key` are keystore key names, not the secrets themselves. The actual values are registered via `mcp-launcher register` and never appear in `launcher.json`. They are never passed to the MCP server process and are not accessible to Claude.
 
 ---
 
