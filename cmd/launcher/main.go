@@ -75,7 +75,7 @@ func runLaunch(serviceName string) error {
 	}
 
 	// Phase 2: Child process restart loop
-	if svc.RestartIntervalSeconds > 0 {
+	if svc.CheckIntervalSeconds > 0 {
 		// Use signal.NotifyContext so Ctrl+C / SIGTERM triggers graceful shutdown
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 		defer stop()
@@ -120,11 +120,10 @@ func runChildOnce(svc config.ServiceConfig, env []string) error {
 }
 
 // runChildWithRestart serves the client over a JSON-RPC proxy that can restart
-// the child transparently (see internal/mcpproxy). The wall-clock interval no
-// longer kills unconditionally: it is only a poll cadence. An actual restart
-// happens when there is a reason (token near expiry, or the keystore token was
-// rotated out from under the running child) AND the proxy is idle, so in-flight
-// requests are never interrupted.
+// the child transparently (see internal/mcpproxy). The check interval is only a
+// poll cadence. An actual restart happens when there is a reason (token near
+// expiry, or the keystore token was rotated out from under the running child)
+// AND the proxy is idle, so in-flight requests are never interrupted.
 func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store keystore.Store, serviceName string) error {
 	var (
 		tokenStoreKey  string
@@ -210,7 +209,7 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 		Spawn:         spawn,
 		Refresh:       refresh,
 		RestartReason: restartReason,
-		CheckInterval: time.Duration(svc.RestartIntervalSeconds) * time.Second,
+		CheckInterval: time.Duration(svc.CheckIntervalSeconds) * time.Second,
 		DrainTimeout:  time.Duration(svc.DrainTimeoutSeconds) * time.Second,
 		Logf:          func(format string, a ...any) { fmt.Fprintf(os.Stderr, "info: "+format+"\n", a...) },
 	})
