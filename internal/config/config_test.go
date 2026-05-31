@@ -23,13 +23,13 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if svc.EnvKeys["GITHUB_TOKEN"] != "mcp-launcher/github/GITHUB_TOKEN" {
 		t.Errorf("unexpected env_key value: %q", svc.EnvKeys["GITHUB_TOKEN"])
 	}
-	if svc.RestartIntervalSeconds != 60 {
-		t.Errorf("expected restart_interval_seconds 60, got %d", svc.RestartIntervalSeconds)
+	if svc.CheckIntervalSeconds != 60 {
+		t.Errorf("expected check_interval_seconds 60, got %d", svc.CheckIntervalSeconds)
 	}
-	// aws service should have default 0 (no restart)
+	// aws service should have default 0 (no check interval)
 	awsSvc := cfg["aws"]
-	if awsSvc.RestartIntervalSeconds != 0 {
-		t.Errorf("expected aws restart_interval_seconds 0, got %d", awsSvc.RestartIntervalSeconds)
+	if awsSvc.CheckIntervalSeconds != 0 {
+		t.Errorf("expected aws check_interval_seconds 0, got %d", awsSvc.CheckIntervalSeconds)
 	}
 }
 
