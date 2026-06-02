@@ -8,6 +8,11 @@
 *.so
 *.dylib
 
+# Build output
+mcp-launcher
+mcp-launcher-*
+dist/
+
 # Test binary, built with `go test -c`
 *.test
 
