@@ -35,13 +35,15 @@ This means:
 
 ```
 AI Tool (Claude Desktop / etc.)
-    ↓
-mcp-launcher  ← fetches token from OS keystore, injects into env
-    ↓
+    ↓↑  (JSON-RPC over stdio)
+mcp-launcher  ← fetches token from OS keystore, injects into env,
+                and proxies the MCP stream so it can transparently
+                restart the server when the token rotates
+    ↓↑
 MCP Server (github-mcp-server, etc.)
 ```
 
-Your config files contain **no secrets**. The MCP server receives its token via environment variables, just as before — it never knows the difference.
+Your config files contain **no secrets**. The MCP server receives its token via environment variables, just as before — it never knows the difference. In Phase 2, mcp-launcher also acts as a JSON-RPC proxy so it can swap in a fresh token without the AI tool ever noticing (see [Phase 2](#phase-2-short-lived-tokens-via-github-app)).
 
 ---
 
@@ -58,7 +60,8 @@ Your config files contain **no secrets**. The MCP server receives its token via 
 ### Phase 2 (Released)
 - ✅ Automatic token rotation via GitHub App
 - ✅ Short-lived tokens (max 1 hour, vs forever for personal access tokens)
-- ✅ Automatic refresh on each launch — no need to restart your AI tool manually
+- ✅ Transparent refresh — mcp-launcher proxies the MCP stream and restarts the
+  server with a fresh token without the AI tool noticing (no manual restart)
 
 ### Phase 3 (Planned)
 - 🔐 Passkey / FIDO2 authentication before unlocking secrets
@@ -85,6 +88,14 @@ The token lives only in the child process's environment. It never touches a file
 
 ### Phase 2: Short-lived token via GitHub App
 
+In Phase 2, mcp-launcher does **not** just pass frames straight through. Because an environment variable cannot be changed after a process has started, rotating a token requires restarting the MCP server — and a naive restart would break the live MCP session. To solve this, mcp-launcher runs as a **JSON-RPC proxy** between the AI tool and the MCP server:
+
+```
+AI Tool ⇄ mcp-launcher (proxy) ⇄ github-mcp-server (restartable child)
+```
+
+On launch and on every refresh:
+
 ```
 mcp-launcher github
     ↓
@@ -97,8 +108,15 @@ Reads EXPIRY from keystore
     ↓
 Fetches GITHUB_PERSONAL_ACCESS_TOKEN from keystore
     ↓
-Injects into env → starts github-mcp-server
+Injects into env → starts (or restarts) github-mcp-server
 ```
+
+**Transparent restart.** When the token is rotated, the child MCP server must be restarted to pick up the new environment variable. The proxy makes this invisible to the AI tool:
+
+- It caches the client's `initialize` request and `notifications/initialized`, and **replays them to the freshly spawned child** so the new server reaches the operational state. The AI tool never re-handshakes and never sees the restart.
+- Restarts are **idle-gated**: a restart is only flagged as intent; the actual kill waits until there are no in-flight requests. Requests that arrive during the restart window are **queued and flushed afterwards**, so they are delayed but never lost.
+- A **drain timeout** bounds the wait. If in-flight requests do not complete in time, they receive a retryable error and the restart is forced.
+- If the refresh fails (e.g. no network), mcp-launcher logs a warning and continues with the existing token.
 
 **What the MCP server sees:** only the short-lived access token (valid max 1 hour).
 
@@ -115,7 +133,9 @@ Injects into env → starts github-mcp-server
 | GitHub App ID | OS keystore | ❌ No | ❌ No |
 | GitHub App private key (RSA) | OS keystore | ❌ No | ❌ No |
 | Installation ID | OS keystore | ❌ No | ❌ No |
-| Access token (max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly |
+| Access token (max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly¹ |
+
+¹ The access token is only reachable by Claude if a (malicious or buggy) MCP server echoes it back inside a tool response. Claude cannot read the child process's environment variables directly.
 
 The App ID, private key, and Installation ID are registered once via the CLI and never leave the keystore. They are never passed to the MCP server process and never appear in any channel that Claude can read.
 
@@ -157,7 +177,7 @@ The private key never enters any channel Claude can access, so it is not a promp
 
 ## Installation
 
-> 📦 Pre-built binaries coming soon.
+Pre-built binaries are published on the [Releases](https://github.com/masuda-masuo/mcp-launcher/releases) page. You can also build from source.
 
 ### Build mcp-launcher from source
 
@@ -166,6 +186,23 @@ git clone https://github.com/masuda-masuo/mcp-launcher
 cd mcp-launcher
 go build -o mcp-launcher ./cmd/launcher
 ```
+
+### Linux: install a keystore backend
+
+On Linux, mcp-launcher stores secrets via the Secret Service API, which requires `libsecret` (GNOME Keyring) or KWallet to be installed and unlocked:
+
+```bash
+# Debian / Ubuntu
+sudo apt install libsecret-1-0 gnome-keyring
+
+# Fedora
+sudo dnf install libsecret gnome-keyring
+
+# Arch
+sudo pacman -S libsecret gnome-keyring
+```
+
+> **Note**: A keyring daemon must be running and unlocked for the keystore to be accessible. On headless systems you may need to start and unlock the keyring manually. Windows (Credential Manager) and macOS (Keychain) require no extra packages.
 
 ### Set up the GitHub MCP Server
 
@@ -179,6 +216,8 @@ https://github.com/github/github-mcp-server/releases
 ---
 
 ## Quick Start: Phase 1 (Static PAT)
+
+> A complete, ready-to-edit config is provided in [`launcher.example.json`](launcher.example.json). Copy it to `launcher.json` and adjust the paths and keys. Keep `launcher.json` out of version control (it is already in `.gitignore`).
 
 ### 1. Register your token
 
@@ -217,7 +256,7 @@ mcp-launcher register github GITHUB_PERSONAL_ACCESS_TOKEN ghp_yourtoken
 
 ## Phase 2: Short-lived Tokens via GitHub App
 
-Phase 2 replaces the long-lived Personal Access Token with short-lived installation access tokens (max 1 hour) issued by a GitHub App. The token is automatically refreshed when it approaches expiry.
+Phase 2 replaces the long-lived Personal Access Token with short-lived installation access tokens (max 1 hour) issued by a GitHub App. The token is automatically refreshed when it approaches expiry, and the MCP server is transparently restarted to pick it up (see [How It Works](#phase-2-short-lived-token-via-github-app)).
 
 ### Step 1: Create a GitHub App
 
@@ -271,7 +310,8 @@ mcp-launcher register github INSTALLATION_ID 7654321
       "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
     },
-    "check_interval_seconds": 60
+    "check_interval_seconds": 60,
+    "drain_timeout_seconds": 30
   }
 }
 ```
@@ -279,13 +319,15 @@ mcp-launcher register github INSTALLATION_ID 7654321
 ### How token refresh works
 
 - Token is fetched from GitHub App API and stored in the keystore on first launch
-- `check_interval_seconds` controls how often mcp-launcher checks the token expiry (default: no polling)
+- `check_interval_seconds` controls how often mcp-launcher checks the token expiry **in the background while running**
 - If the token is still valid, nothing happens (no API call, no restart)
 - If expiring soon (within `refresh_before_seconds`), a new token is fetched and the child process is restarted transparently
 - The restart is idle-gated: mcp-launcher waits for any in-flight requests to complete before restarting
 - If the refresh fails (e.g. no network), mcp-launcher logs a warning and continues with the existing token
 
-> **Note**: The access token may be expired if you haven't used Claude Desktop for more than 1 hour. It will be refreshed automatically on the next launch — no manual action required.
+> **If you omit `check_interval_seconds`**: mcp-launcher only refreshes the token **at launch**, with no background polling. This is fine for short-lived sessions, but if the AI tool keeps the connection open longer than the token's lifetime (1 hour), the token can expire mid-session and calls will start failing until the next launch. For long-running clients like Claude Desktop, set `check_interval_seconds` (e.g. `60`) so the token is refreshed in the background before it expires.
+
+> **Note**: The access token may also be expired if you haven't used Claude Desktop for more than 1 hour. It will be refreshed automatically on the next launch — no manual action required.
 
 ### Current limitations
 
@@ -305,7 +347,7 @@ mcp-launcher register github INSTALLATION_ID 7654321
 | `env_keys` | ✅ | object | Map of `ENV_VAR_NAME` → keystore key. Each entry is fetched from the OS keystore and injected into the child process environment |
 | `token_source` | - | object | GitHub App token configuration. When set, mcp-launcher fetches and refreshes short-lived tokens automatically |
 | `check_interval_seconds` | - | int | How often (in seconds) to check whether the token needs refreshing. A restart only occurs when the token is actually near expiry — this is **not** "restart every N seconds". Omit to disable background checking (token is only refreshed at launch) |
-| `drain_timeout_seconds` | - | int | Maximum time (in seconds) to wait for in-flight requests to complete before forcing a restart. Zero or omitted means wait indefinitely |
+| `drain_timeout_seconds` | - | int | Maximum time (in seconds) to wait for in-flight requests to complete before forcing a restart. Zero or omitted means wait indefinitely — a request that never returns (e.g. a hung or unresponsive server) would block the restart indefinitely. A finite value (e.g. `30`–`60`) is recommended so a stuck request cannot prevent token rotation; abandoned requests receive a retryable error |
 
 ### `token_source` fields
 
