@@ -16,7 +16,17 @@ import (
 	"github.com/masuda-masuo/mcp-launcher/internal/refresher"
 )
 
-const defaultConfigPath = "launcher.json"
+const (
+	defaultConfigPath = "launcher.json"
+
+	// warmUpTimeout is the maximum time the pre-launch token refresh is allowed
+	// to block.  If the GitHub API (or keystore) takes longer than this, we fall
+	// through immediately with whatever token is already in the keystore so the
+	// MCP client's initialize handshake is never starved past its own timeout.
+	// The first check_interval tick will complete the refresh and restart the
+	// child with a fresh token if needed.
+	warmUpTimeout = 5 * time.Second
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -57,7 +67,10 @@ func runLaunch(serviceName string) error {
 		return fmt.Errorf("initializing keystore: %w", err)
 	}
 
-	// Phase 2: Token refresh before launch
+	// Best-effort pre-launch token warm-up.  A short timeout prevents this from
+	// blocking past the MCP client's initialize timeout on cold start (issue #14).
+	// Failures are non-fatal: the proxy's Refresh hook retries on the first
+	// check_interval tick.
 	if svc.TokenSource != nil {
 		tokenKey, ok := svc.EnvKeys[svc.TokenSource.TargetEnvKey]
 		if !ok {
@@ -67,14 +80,15 @@ func runLaunch(serviceName string) error {
 			)
 		}
 
+		warmCtx, cancel := context.WithTimeout(context.Background(), warmUpTimeout)
+		defer cancel()
 		r := refresher.New(store, *svc.TokenSource, tokenKey)
-		if err := r.RunOnce(context.Background()); err != nil {
-			// Log warning but continue with existing token (fail-open)
-			fmt.Fprintf(os.Stderr, "warning: token refresh failed: %v (continuing with existing token)\n", err)
+		if err := r.RunOnce(warmCtx); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: pre-launch token refresh skipped: %v (will retry on first check interval)\n", err)
 		}
 	}
 
-	// Phase 2: Child process restart loop
+	// Child process restart loop
 	if svc.CheckIntervalSeconds > 0 {
 		// Use signal.NotifyContext so Ctrl+C / SIGTERM triggers graceful shutdown
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
