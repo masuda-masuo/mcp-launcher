@@ -93,7 +93,10 @@ type Options struct {
 
 	// Spawn starts a new child using the current environment and returns it.
 	Spawn func(ctx context.Context) (Child, error)
-	// Refresh runs immediately before each spawn (e.g. token refresh). May be nil.
+	// Refresh runs immediately before each re-spawn during a restart cycle
+	// (e.g. token refresh).  It is NOT called before the initial spawn so that
+	// the MCP client's initialize handshake is never blocked on a token fetch
+	// at cold-start time (see issue #14).  May be nil.
 	Refresh func(ctx context.Context) error
 	// RestartReason reports whether a restart is currently warranted and a short
 	// human-readable reason. Polled every CheckInterval. May be nil (never
@@ -159,13 +162,10 @@ func (p *Proxy) State() State {
 }
 
 // Run spawns the initial child and serves until the client stream ends or ctx
-// is cancelled.
+// is cancelled.  Refresh (if set) is intentionally NOT called here: the caller
+// is responsible for any best-effort warm-up before Run, and the restart cycle
+// in maybeRestart calls Refresh before every subsequent spawn.
 func (p *Proxy) Run(ctx context.Context) error {
-	if p.opts.Refresh != nil {
-		if err := p.opts.Refresh(ctx); err != nil {
-			p.logf("warning: token refresh failed: %v (continuing with existing token)", err)
-		}
-	}
 	child, err := p.opts.Spawn(ctx)
 	if err != nil {
 		return err
