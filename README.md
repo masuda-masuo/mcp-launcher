@@ -393,6 +393,14 @@ mcp-launcher register github INSTALLATION_ID 7654321
 
 ---
 
+## Community
+
+This project was discussed in the MCP community here:
+
+- 💡 [Ideas - Security: mcp-launcher — transparently managing secrets and token rotation for local stdio MCP servers](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2849) _(modelcontextprotocol/modelcontextprotocol)_
+
+---
+
 ## License
 
 MIT
