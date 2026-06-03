@@ -125,6 +125,10 @@ type harness struct {
 }
 
 func newHarness(t *testing.T, ctx context.Context, big, hold bool, drain time.Duration) *harness {
+	return newHarnessWithRefresh(t, ctx, big, hold, drain, nil)
+}
+
+func newHarnessWithRefresh(t *testing.T, ctx context.Context, big, hold bool, drain time.Duration, refresh func(context.Context) error) *harness {
 	t.Helper()
 	cInR, cInW := io.Pipe()
 	cOutR, cOutW := io.Pipe()
@@ -140,6 +144,7 @@ func newHarness(t *testing.T, ctx context.Context, big, hold bool, drain time.Du
 			h.mu.Unlock()
 			return s, nil
 		},
+		Refresh: refresh,
 		RestartReason: func() (bool, string) {
 			if atomic.CompareAndSwapInt32(&h.restart, 1, 0) {
 				return true, "test-triggered"
@@ -365,5 +370,37 @@ func TestLargeMessageNotTruncated(t *testing.T) {
 	r2 := h.waitFrame(t, respWithID("2"), 3*time.Second)
 	if got := len(resultText(r2.Raw)); got != 100*1024 {
 		t.Fatalf("large result truncated: expected %d bytes, got %d", 100*1024, got)
+	}
+}
+
+// TestRefreshNotCalledOnInitialSpawn verifies the fix for issue #14:
+// Refresh must NOT block the initial spawn path.  A slow Refresh (longer than
+// the MCP client's initialize timeout) must not prevent the child from starting.
+func TestRefreshNotCalledOnInitialSpawn(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var refreshCalls int32
+	slowRefresh := func(ctx context.Context) error {
+		atomic.AddInt32(&refreshCalls, 1)
+		return nil
+	}
+
+	h := newHarnessWithRefresh(t, ctx, false, false, time.Second, slowRefresh)
+
+	// The initial spawn must complete without Refresh being called.
+	// We verify this by confirming the handshake succeeds immediately and that
+	// refreshCalls is still 0 at that point.
+	h.handshake(t)
+
+	if n := atomic.LoadInt32(&refreshCalls); n != 0 {
+		t.Fatalf("Refresh was called %d time(s) before or during initial spawn; want 0 (issue #14)", n)
+	}
+
+	// After a restart Refresh must be called exactly once (before the re-spawn).
+	h.triggerRestartAndWait(t)
+
+	if n := atomic.LoadInt32(&refreshCalls); n != 1 {
+		t.Fatalf("Refresh was called %d time(s) after one restart; want 1", n)
 	}
 }
