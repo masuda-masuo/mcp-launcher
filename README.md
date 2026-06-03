@@ -336,6 +336,116 @@ mcp-launcher register github INSTALLATION_ID 7654321
 
 ---
 
+## WSL (Windows Subsystem for Linux) Setup
+
+> **Note**: WSL does not have a desktop session, so the Linux keystore backend (GNOME Keyring / libsecret) is not reliably available. Use the **Windows-native binaries** and the **Windows Credential Manager** instead. This is the recommended approach for WSL users.
+
+### Why the Linux keystore doesn't work in WSL
+
+WSL lacks a D-Bus session and a running keyring daemon by default. Attempting to use the Linux binary results in errors like:
+
+```
+failed to unlock correct collection '/org/freedesktop/secrets/aliases/default'
+```
+
+or
+
+```
+dial unix /tmp/dbus-XXXXXXXX: connect: no such file or directory
+```
+
+The solution is to use Windows-native binaries for both `mcp-launcher` and `github-mcp-server`, so all keystore operations go through Windows Credential Manager.
+
+### Step 1: Build Windows binaries from WSL
+
+```bash
+# Build mcp-launcher for Windows
+cd /home/<you>/dev/projects/mcp-launcher
+GOOS=windows GOARCH=amd64 go build -o mcp-launcher-windows.exe ./cmd/launcher
+
+# Build github-mcp-server for Windows
+cd /home/<you>/dev/projects/github-mcp-server
+GOOS=windows GOARCH=amd64 go build -o github-mcp-server.exe ./cmd/github-mcp-server
+```
+
+### Step 2: Copy binaries to a Windows path
+
+Run in PowerShell:
+
+```powershell
+copy \\wsl.localhost\Ubuntu\home\<you>\dev\projects\mcp-launcher\mcp-launcher-windows.exe C:\Users\<you>\mcp-launcher.exe
+copy \\wsl.localhost\Ubuntu\dev\projects\github-mcp-server\github-mcp-server.exe C:\Users\<you>\github-mcp-server.exe
+```
+
+### Step 3: Register secrets using the Windows binary
+
+Run in PowerShell (this stores secrets in Windows Credential Manager):
+
+```powershell
+C:\Users\<you>\mcp-launcher.exe register github APP_ID 123456
+C:\Users\<you>\mcp-launcher.exe register github INSTALLATION_ID 7654321
+C:\Users\<you>\mcp-launcher.exe register github PRIVATE_KEY (Get-Content \\wsl.localhost\Ubuntu\home\<you>\...\private-key.pem -Raw)
+```
+
+### Step 4: Update `launcher.json` to use Windows paths
+
+In your `launcher.json` (located in WSL or copied to Windows), set `command` to the Windows path:
+
+```json
+{
+  "github": {
+    "command": "C:\\Users\\<you>\\github-mcp-server.exe",
+    "args": ["stdio"],
+    "env_keys": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
+    },
+    "token_source": {
+      "type": "github_app",
+      "app_id_key": "mcp-launcher/github/APP_ID",
+      "private_key_key": "mcp-launcher/github/PRIVATE_KEY",
+      "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
+      "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "refresh_before_seconds": 600
+    },
+    "check_interval_seconds": 60,
+    "drain_timeout_seconds": 30
+  }
+}
+```
+
+Copy `launcher.json` to a Windows path (e.g. `C:\Users\<you>\launcher.json`) so the Windows binary can find it.
+
+### Step 5: Configure your MCP client
+
+Point your MCP client (e.g. claude.ai) at the Windows binary and pass `MCP_LAUNCHER_CONFIG` so it finds the config file:
+
+```json
+{
+  "command": "C:\\Users\\<you>\\mcp-launcher.exe",
+  "args": ["github"],
+  "env": {
+    "MCP_LAUNCHER_CONFIG": "C:\\Users\\<you>\\launcher.json"
+  }
+}
+```
+
+### Verify
+
+Run from PowerShell to confirm everything works end-to-end before connecting your MCP client:
+
+```powershell
+$env:MCP_LAUNCHER_CONFIG = "C:\Users\<you>\launcher.json"
+C:\Users\<you>\mcp-launcher.exe github
+```
+
+You should see output like:
+
+```
+GitHub MCP Server running on stdio
+```
+
+---
+
 ## Configuration Reference
 
 ### Service config (`launcher.json`)
@@ -371,6 +481,7 @@ mcp-launcher register github INSTALLATION_ID 7654321
 | Windows | Credential Manager (DPAPI) | Windows Hello / FIDO2 |
 | macOS | Keychain | Touch ID / Face ID / FIDO2 |
 | Linux | libsecret / kwallet | FIDO2 |
+| WSL | Windows Credential Manager (use Windows binary) | — |
 
 ---
 
