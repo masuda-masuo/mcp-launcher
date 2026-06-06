@@ -18,11 +18,15 @@ func TestRunOnce_NoExpiryKey_FetchesToken(t *testing.T) {
 	// We just verify the code path is executed
 
 	source := config.TokenSource{
+		Type:                 "github_app",
 		RefreshBeforeSeconds: 600,
 	}
 
-	r := New(store, source, tokenKey)
-	err := r.RunOnce(context.Background())
+	r, err := New(store, source, tokenKey)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+	err = r.RunOnce(context.Background())
 	if err != nil {
 		// Expected: fetcher can't reach GitHub
 		t.Logf("RunOnce attempted fetch and failed as expected: %v", err)
@@ -40,11 +44,15 @@ func TestRunOnce_TokenStillValid_SkipsRefresh(t *testing.T) {
 	store.Set(tokenKey+"_EXPIRY", time.Now().Add(1*time.Hour).UTC().Format(time.RFC3339))
 
 	source := config.TokenSource{
+		Type:                 "github_app",
 		RefreshBeforeSeconds: 600, // 10 minutes
 	}
 
-	r := New(store, source, tokenKey)
-	err := r.RunOnce(context.Background())
+	r, err := New(store, source, tokenKey)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+	err = r.RunOnce(context.Background())
 	if err != nil {
 		t.Fatalf("expected no error for valid token, got: %v", err)
 	}
@@ -65,11 +73,15 @@ func TestRunOnce_TokenExpired_Refreshes(t *testing.T) {
 	store.Set(tokenKey+"_EXPIRY", time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
 
 	source := config.TokenSource{
+		Type:                 "github_app",
 		RefreshBeforeSeconds: 600,
 	}
 
-	r := New(store, source, tokenKey)
-	err := r.RunOnce(context.Background())
+	r, err := New(store, source, tokenKey)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+	err = r.RunOnce(context.Background())
 	if err != nil {
 		// Expected: fetcher can't reach GitHub
 		t.Logf("RunOnce attempted refresh and failed as expected: %v", err)
@@ -87,11 +99,15 @@ func TestRunOnce_RefreshBeforeSeconds(t *testing.T) {
 	store.Set(tokenKey+"_EXPIRY", time.Now().Add(5*time.Minute).UTC().Format(time.RFC3339))
 
 	source := config.TokenSource{
+		Type:                 "github_app",
 		RefreshBeforeSeconds: 600, // 10 minutes — trigger refresh
 	}
 
-	r := New(store, source, tokenKey)
-	err := r.RunOnce(context.Background())
+	r, err := New(store, source, tokenKey)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+	err = r.RunOnce(context.Background())
 	if err != nil {
 		// Expected to attempt refresh since token is within refresh window
 		t.Logf("RunOnce attempted refresh as expected: %v", err)
@@ -104,11 +120,17 @@ func TestRefresh_StoresTokenAndExpiry(t *testing.T) {
 	store := keystore.NewMemoryStore()
 	tokenKey := "mcp-launcher/test/MY_TOKEN"
 
-	source := config.TokenSource{}
-	r := New(store, source, tokenKey)
+	source := config.TokenSource{
+		Type: "github_app",
+	}
 
-	// Override fetcher with mock
-	r.fetcher = &mockFetcher{}
+	// Create a minimal Refresher with mock fetcher
+	r := &Refresher{
+		store:    store,
+		fetcher:  &mockFetcher{},
+		source:   source,
+		tokenKey: tokenKey,
+	}
 
 	err := r.refresh(context.Background())
 	if err != nil {
@@ -137,12 +159,14 @@ func TestRefresh_StoresTokenAndExpiry(t *testing.T) {
 	}
 }
 
-func TestNew_SetsTokenKey(t *testing.T) {
+func TestNew_UnknownType_ReturnsError(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	source := config.TokenSource{}
-	r := New(store, source, "mcp-launcher/test/KEY")
-	if r.tokenKey != "mcp-launcher/test/KEY" {
-		t.Errorf("expected tokenKey to be set")
+	source := config.TokenSource{
+		Type: "unknown_type",
+	}
+	_, err := New(store, source, "mcp-launcher/test/KEY")
+	if err == nil {
+		t.Fatal("expected error for unknown type")
 	}
 }
 

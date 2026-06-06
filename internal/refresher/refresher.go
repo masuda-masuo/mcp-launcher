@@ -5,25 +5,46 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/masuda-masuo/mcp-launcher/internal/awssts"
 	"github.com/masuda-masuo/mcp-launcher/internal/config"
 	"github.com/masuda-masuo/mcp-launcher/internal/githubapp"
 	"github.com/masuda-masuo/mcp-launcher/internal/keystore"
 )
 
+// TokenFetcher is the interface for fetching tokens.
+type TokenFetcher interface {
+	FetchToken(ctx context.Context) (token string, expiry time.Time, err error)
+}
+
 type Refresher struct {
 	store    keystore.Store
-	fetcher  githubapp.TokenFetcher
+	fetcher  TokenFetcher
 	source   config.TokenSource
 	tokenKey string
 }
 
-func New(store keystore.Store, source config.TokenSource, tokenKey string) *Refresher {
+func New(store keystore.Store, source config.TokenSource, tokenKey string) (*Refresher, error) {
+	var fetcher TokenFetcher
+	var err error
+
+	switch source.Type {
+	case "github_app":
+		fetcher = githubapp.NewFetcher(store, source)
+	case "aws_sts":
+		fetcher, err = awssts.NewFetcher(store, source.RoleARNKey, source.RoleSessionName, source.DurationSeconds)
+		if err != nil {
+			return nil, fmt.Errorf("creating aws_sts fetcher: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unknown token source type: %q", source.Type)
+	}
+
 	return &Refresher{
 		store:    store,
-		fetcher:  githubapp.NewFetcher(store, source),
+		fetcher:  fetcher,
 		source:   source,
 		tokenKey: tokenKey,
-	}
+	}, nil
 }
 
 func (r *Refresher) RunOnce(ctx context.Context) error {

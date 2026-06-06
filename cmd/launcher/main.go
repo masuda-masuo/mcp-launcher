@@ -82,8 +82,10 @@ func runLaunch(serviceName string) error {
 
 		warmCtx, cancel := context.WithTimeout(context.Background(), warmUpTimeout)
 		defer cancel()
-		r := refresher.New(store, *svc.TokenSource, tokenKey)
-		if err := r.RunOnce(warmCtx); err != nil {
+		r, err := refresher.New(store, *svc.TokenSource, tokenKey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: creating refresher failed: %v (will retry on first check interval)\n", err)
+		} else if err := r.RunOnce(warmCtx); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: pre-launch token refresh skipped: %v (will retry on first check interval)\n", err)
 		}
 	}
@@ -159,7 +161,10 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 		if !hasToken {
 			return nil
 		}
-		r := refresher.New(store, *svc.TokenSource, tokenStoreKey)
+		r, err := refresher.New(store, *svc.TokenSource, tokenStoreKey)
+		if err != nil {
+			return fmt.Errorf("creating refresher: %w", err)
+		}
 		return r.RunOnce(ctx)
 	}
 
