@@ -25,7 +25,7 @@ type Fetcher struct {
 	targetEnvKey    string // prefix for keystore keys (e.g., "AWS")
 }
 
-func NewFetcher(store keystore.Store, roleARNKey, roleSessionName, targetEnvKey string, durationSeconds int) (*Fetcher, error) {
+func NewFetcher(ctx context.Context, store keystore.Store, roleARNKey, roleSessionName, targetEnvKey string, durationSeconds int) (*Fetcher, error) {
 	roleARN, err := store.Get(roleARNKey)
 	if err != nil {
 		return nil, fmt.Errorf("getting role ARN: %w", err)
@@ -35,7 +35,7 @@ func NewFetcher(store keystore.Store, roleARNKey, roleSessionName, targetEnvKey 
 	}
 
 	// Load AWS config once during initialization
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading AWS config: %w", err)
 	}
