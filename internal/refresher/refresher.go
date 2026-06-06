@@ -31,7 +31,9 @@ func New(store keystore.Store, source config.TokenSource, tokenKey string) (*Ref
 	case "github_app":
 		fetcher = githubapp.NewFetcher(store, source)
 	case "aws_sts":
-		fetcher, err = awssts.NewFetcher(store, source.RoleARNKey, source.RoleSessionName, source.DurationSeconds)
+		// Extract the target_env_key to use as prefix for multi-credential storage
+		targetEnvKey := source.TargetEnvKey
+		fetcher, err = awssts.NewFetcher(store, source.RoleARNKey, source.RoleSessionName, targetEnvKey, source.DurationSeconds)
 		if err != nil {
 			return nil, fmt.Errorf("creating aws_sts fetcher: %w", err)
 		}
