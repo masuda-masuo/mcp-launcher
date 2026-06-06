@@ -19,12 +19,6 @@ import (
 const (
 	defaultConfigPath = "launcher.json"
 
-	// warmUpTimeout is the maximum time the pre-launch token refresh is allowed
-	// to block.  If the GitHub API (or keystore) takes longer than this, we fall
-	// through immediately with whatever token is already in the keystore so the
-	// MCP client's initialize handshake is never starved past its own timeout.
-	// The first check_interval tick will complete the refresh and restart the
-	// child with a fresh token if needed.
 	warmUpTimeout = 5 * time.Second
 )
 
@@ -67,10 +61,6 @@ func runLaunch(serviceName string) error {
 		return fmt.Errorf("initializing keystore: %w", err)
 	}
 
-	// Best-effort pre-launch token warm-up.  A short timeout prevents this from
-	// blocking past the MCP client's initialize timeout on cold start (issue #14).
-	// Failures are non-fatal: the proxy's Refresh hook retries on the first
-	// check_interval tick.
 	if svc.TokenSource != nil {
 		tokenKey, ok := svc.EnvKeys[svc.TokenSource.TargetEnvKey]
 		if !ok {
@@ -82,21 +72,20 @@ func runLaunch(serviceName string) error {
 
 		warmCtx, cancel := context.WithTimeout(context.Background(), warmUpTimeout)
 		defer cancel()
-		r := refresher.New(store, *svc.TokenSource, tokenKey)
-		if err := r.RunOnce(warmCtx); err != nil {
+		r, err := refresher.New(warmCtx, store, *svc.TokenSource, tokenKey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: creating refresher failed: %v (will retry on first check interval)\n", err)
+		} else if err := r.RunOnce(warmCtx); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: pre-launch token refresh skipped: %v (will retry on first check interval)\n", err)
 		}
 	}
 
-	// Child process restart loop
 	if svc.CheckIntervalSeconds > 0 {
-		// Use signal.NotifyContext so Ctrl+C / SIGTERM triggers graceful shutdown
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 		defer stop()
 		return runChildWithRestart(ctx, svc, store, serviceName)
 	}
 
-	// Single run (default)
 	env, err := buildEnv(svc, store, serviceName)
 	if err != nil {
 		return err
@@ -133,11 +122,6 @@ func runChildOnce(svc config.ServiceConfig, env []string) error {
 	return cmd.Run()
 }
 
-// runChildWithRestart serves the client over a JSON-RPC proxy that can restart
-// the child transparently (see internal/mcpproxy). The check interval is only a
-// poll cadence. An actual restart happens when there is a reason (token near
-// expiry, or the keystore token was rotated out from under the running child)
-// AND the proxy is idle, so in-flight requests are never interrupted.
 func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store keystore.Store, serviceName string) error {
 	var (
 		tokenStoreKey  string
@@ -153,13 +137,16 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 	}
 
 	var tokMu sync.Mutex
-	spawnedToken := "" // token value the current child was started with
+	spawnedToken := ""
 
 	refresh := func(ctx context.Context) error {
 		if !hasToken {
 			return nil
 		}
-		r := refresher.New(store, *svc.TokenSource, tokenStoreKey)
+		r, err := refresher.New(ctx, store, *svc.TokenSource, tokenStoreKey)
+		if err != nil {
+			return fmt.Errorf("creating refresher: %w", err)
+		}
 		return r.RunOnce(ctx)
 	}
 
@@ -179,7 +166,7 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 		args := append([]string{svc.Command}, svc.Args...)
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Env = env
-		cmd.Stderr = os.Stderr // child logs pass through untouched
+		cmd.Stderr = os.Stderr
 		stdin, err := cmd.StdinPipe()
 		if err != nil {
 			return nil, fmt.Errorf("stdin pipe: %w", err)
@@ -196,7 +183,7 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 
 	restartReason := func() (bool, string) {
 		if !hasToken {
-			return false, "" // no token to rotate: only crash recovery applies
+			return false, ""
 		}
 		if expiryStr, err := store.Get(expiryStoreKey); err == nil {
 			if expiry, perr := time.Parse(time.RFC3339, expiryStr); perr == nil {
@@ -230,7 +217,6 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 	return p.Run(ctx)
 }
 
-// execChild adapts an *exec.Cmd to mcpproxy.Child.
 type execChild struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser

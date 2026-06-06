@@ -8,9 +8,15 @@ import (
 
 type TokenSource struct {
 	Type                 string `json:"type"`
-	AppIDKey             string `json:"app_id_key"`
-	PrivateKeyKey        string `json:"private_key_key"`
-	InstallationIDKey    string `json:"installation_id_key"`
+	// GitHub App
+	AppIDKey             string `json:"app_id_key,omitempty"`
+	PrivateKeyKey        string `json:"private_key_key,omitempty"`
+	InstallationIDKey    string `json:"installation_id_key,omitempty"`
+	// AWS STS
+	RoleARNKey           string `json:"role_arn_key,omitempty"`
+	RoleSessionName      string `json:"role_session_name,omitempty"`
+	DurationSeconds      int    `json:"duration_seconds,omitempty"`
+	// Common
 	TargetEnvKey         string `json:"target_env_key"`
 	RefreshBeforeSeconds int    `json:"refresh_before_seconds"`
 }
