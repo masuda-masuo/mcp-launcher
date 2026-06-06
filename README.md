@@ -62,6 +62,9 @@ Your config files contain **no secrets**. The MCP server receives its token via 
 - ✅ Short-lived tokens (max 1 hour, vs forever for personal access tokens)
 - ✅ Transparent refresh — mcp-launcher proxies the MCP stream and restarts the
   server with a fresh token without the AI tool noticing (no manual restart)
+- ✅ Automatic credential rotation via AWS STS (`AssumeRole`) — short-lived
+  `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` injected
+  and refreshed automatically
 
 ### Phase 3 (Planned)
 - 🔐 Passkey / FIDO2 authentication before unlocking secrets
@@ -134,6 +137,10 @@ Injects into env → starts (or restarts) github-mcp-server
 | GitHub App private key (RSA) | OS keystore | ❌ No | ❌ No |
 | Installation ID | OS keystore | ❌ No | ❌ No |
 | Access token (max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly¹ |
+| AWS IAM Role ARN | OS keystore | ❌ No | ❌ No |
+| AWS_ACCESS_KEY_ID (STS, max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly¹ |
+| AWS_SECRET_ACCESS_KEY (STS, max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly¹ |
+| AWS_SESSION_TOKEN (STS, max 1h) | OS keystore → child env | ✅ Yes | ⚠️ Indirectly¹ |
 
 ¹ The access token is only reachable by Claude if a (malicious or buggy) MCP server echoes it back inside a tool response. Claude cannot read the child process's environment variables directly.
 
@@ -150,7 +157,7 @@ A prompt injection attack — where malicious content in a web page or file tric
 | Private key | ❌ Not reachable | 🔴 High — can mint tokens indefinitely | Never (revoke manually) |
 | Access token | ⚠️ Reachable via MCP tool responses | 🟡 Limited — usable for at most 1 hour | Max 1 hour |
 
-This is why the GitHub App model is preferred over long-lived PATs: even in the worst case where an access token is observed by Claude or leaked via a tool response, it expires within an hour and cannot be used to generate further tokens.
+This is why the GitHub App model is preferred over long-lived PATs: even in the worst case where an access token is observed by Claude or leaked via a tool response, it expires within an hour and cannot be used to generate further tokens. The same reasoning applies to AWS STS credentials — short-lived STS credentials are far safer than long-lived IAM user access keys.
 
 The private key never enters any channel Claude can access, so it is not a prompt injection target. If it were compromised it would require OS-level access — a fundamentally different and much harder attack. Still, treat it as a long-lived credential: store it only in the keystore, never in a file, and revoke it immediately from your GitHub App settings if you suspect compromise.
 
@@ -162,6 +169,7 @@ The private key never enters any channel Claude can access, so it is not a promp
 - ✅ Key sprawl across multiple tools and config locations
 - ✅ Long-lived token exposure — even if the MCP server leaks the token, it expires within 1 hour
 - ✅ Private key and App credentials reaching Claude or any MCP server
+- ✅ Long-lived AWS IAM user keys — replaced with short-lived STS credentials
 
 ### What this does NOT protect against
 
@@ -329,10 +337,62 @@ mcp-launcher register github INSTALLATION_ID 7654321
 
 > **Note**: The access token may also be expired if you haven't used Claude Desktop for more than 1 hour. It will be refreshed automatically on the next launch — no manual action required.
 
-### Current limitations
+---
 
-- **GitHub only**: Phase 2 token rotation is implemented for GitHub App only. Other services (AWS, Azure, GCP) use static secrets via Phase 1 for now.
-- **Private key security**: The GitHub App private key is stored in the OS keystore, which is more secure than a file, but it is a long-lived credential. If compromised, revoke it immediately from your GitHub App settings.
+## Phase 2: Short-lived AWS Credentials via STS
+
+Instead of storing long-lived IAM user access keys, mcp-launcher can assume an IAM Role via AWS STS and automatically rotate the resulting short-lived credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`).
+
+The base credentials used to call `AssumeRole` are loaded from the **standard AWS credential chain** (environment variables, `~/.aws/credentials`, EC2/ECS instance profile, etc.) — they are never registered in the launcher keystore.
+
+### Step 1: Register the IAM Role ARN in the keystore
+
+```bash
+mcp-launcher register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRole
+```
+
+### Step 2: Update `launcher.json`
+
+```json
+{
+  "my-aws-mcp": {
+    "command": "/path/to/aws-mcp-server",
+    "args": ["stdio"],
+    "env_keys": {
+      "AWS_ACCESS_KEY_ID":     "mcp-launcher/my-aws-mcp/AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/my-aws-mcp/AWS_SECRET_ACCESS_KEY",
+      "AWS_SESSION_TOKEN":     "mcp-launcher/my-aws-mcp/AWS_SESSION_TOKEN"
+    },
+    "token_source": {
+      "type": "aws_sts",
+      "role_arn_key": "mcp-launcher/my-aws-mcp/ROLE_ARN",
+      "role_session_name": "mcp-launcher-session",
+      "duration_seconds": 3600,
+      "target_env_key": "AWS",
+      "refresh_before_seconds": 600
+    },
+    "check_interval_seconds": 60,
+    "drain_timeout_seconds": 30
+  }
+}
+```
+
+**Key points:**
+
+- `role_arn_key` — keystore key where the IAM Role ARN is stored (registered in Step 1)
+- `role_session_name` — a human-readable label that appears in CloudTrail logs
+- `duration_seconds` — lifetime of the STS credentials (default: 3600 = 1 hour; min: 900)
+- `target_env_key` — used as a prefix for keystore keys: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+- The three `env_keys` entries map the keystore keys to the environment variables the MCP server expects
+
+### How credential rotation works
+
+The same refresh mechanism as GitHub App applies:
+
+- On first launch, mcp-launcher calls `AssumeRole` and stores all three credentials in the keystore
+- Every `check_interval_seconds`, it checks the expiry and calls `AssumeRole` again if the credentials are within `refresh_before_seconds` of expiry
+- The MCP server is transparently restarted with the fresh credentials
+- If the refresh fails, mcp-launcher logs a warning and continues with the existing credentials
 
 ---
 
@@ -455,22 +515,39 @@ GitHub MCP Server running on stdio
 | `command` | ✅ | string | Full path to the MCP server executable |
 | `args` | - | string[] | Command-line arguments passed to the MCP server |
 | `env_keys` | ✅ | object | Map of `ENV_VAR_NAME` → keystore key. Each entry is fetched from the OS keystore and injected into the child process environment |
-| `token_source` | - | object | GitHub App token configuration. When set, mcp-launcher fetches and refreshes short-lived tokens automatically |
+| `token_source` | - | object | Token source configuration. When set, mcp-launcher fetches and refreshes short-lived tokens automatically |
 | `check_interval_seconds` | - | int | How often (in seconds) to check whether the token needs refreshing. A restart only occurs when the token is actually near expiry — this is **not** "restart every N seconds". Omit to disable background checking (token is only refreshed at launch) |
 | `drain_timeout_seconds` | - | int | Maximum time (in seconds) to wait for in-flight requests to complete before forcing a restart. Zero or omitted means wait indefinitely — a request that never returns (e.g. a hung or unresponsive server) would block the restart indefinitely. A finite value (e.g. `30`–`60`) is recommended so a stuck request cannot prevent token rotation; abandoned requests receive a retryable error |
 
 ### `token_source` fields
 
+#### Common fields
+
 | Field | Required | Description |
 |---|---|---|
-| `type` | ✅ | Token source type. Currently only `"github_app"` is supported |
+| `type` | ✅ | Token source type: `"github_app"` or `"aws_sts"` |
+| `target_env_key` | ✅ | For `github_app`: the `env_keys` entry that receives the access token. For `aws_sts`: the prefix used to derive the three keystore keys (`<prefix>_ACCESS_KEY_ID`, `<prefix>_SECRET_ACCESS_KEY`, `<prefix>_SESSION_TOKEN`) |
+| `refresh_before_seconds` | ✅ | Refresh the token when its remaining lifetime falls below this threshold (in seconds). Recommended: `600` (10 minutes) |
+
+#### `type: "github_app"` fields
+
+| Field | Required | Description |
+|---|---|---|
 | `app_id_key` | ✅ | Keystore key where the GitHub App ID is stored |
 | `private_key_key` | ✅ | Keystore key where the GitHub App RSA private key (PEM) is stored |
 | `installation_id_key` | ✅ | Keystore key where the GitHub App Installation ID is stored |
-| `target_env_key` | ✅ | The `env_keys` entry that will receive the generated access token (e.g. `"GITHUB_PERSONAL_ACCESS_TOKEN"`) |
-| `refresh_before_seconds` | ✅ | Refresh the token when its remaining lifetime falls below this threshold (in seconds). Recommended: `600` (10 minutes) |
 
 > **Security note**: `app_id_key`, `private_key_key`, and `installation_id_key` are keystore key names, not the secrets themselves. The actual values are registered via `mcp-launcher register` and never appear in `launcher.json`. They are never passed to the MCP server process and are not accessible to Claude.
+
+#### `type: "aws_sts"` fields
+
+| Field | Required | Description |
+|---|---|---|
+| `role_arn_key` | ✅ | Keystore key where the IAM Role ARN is stored |
+| `role_session_name` | ✅ | Session name passed to `AssumeRole` (appears in CloudTrail logs) |
+| `duration_seconds` | - | Lifetime of the STS credentials in seconds (default: `3600`, minimum: `900`) |
+
+> **Note**: The base AWS credentials used to call `AssumeRole` are loaded from the standard AWS credential chain (environment variables, `~/.aws/credentials`, instance profile, etc.) — they are **not** registered in the launcher keystore.
 
 ---
 
@@ -499,7 +576,7 @@ GitHub MCP Server running on stdio
 | Phase | Status | Description |
 |---|---|---|
 | 1 | ✅ Released | Secure launcher with OS keystore integration |
-| 2 | ✅ Released | Automatic token rotation via GitHub App (GitHub only) |
+| 2 | ✅ Released | Automatic token rotation via GitHub App and AWS STS |
 | 3 | 📋 Planned | FIDO2 / passkey authentication |
 
 ---
