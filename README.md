@@ -107,17 +107,17 @@ mcp-launcher register github GITHUB_PERSONAL_ACCESS_TOKEN ghp_yourtoken
 
 Phase 2 replaces long-lived PATs with tokens that expire in at most 1 hour and are refreshed automatically.
 
-- **[GitHub App setup →](docs/github-app-setup.md)**
-- **[AWS STS setup →](docs/aws-sts-setup.md)**
+- **[GitHub App setup →](docs/setup/github-app-setup.md)**
+- **[AWS STS setup →](docs/setup/aws-sts-setup.md)**
 
 ---
 
 ## Further Reading
 
-- [Security Model](docs/security-model.md) — what is stored where, threat model, prompt injection analysis
-- [Configuration Reference](docs/configuration-reference.md) — all `launcher.json` fields
-- [WSL Setup](docs/wsl-setup.md) — how to use Windows Credential Manager from WSL
-- [Adding a Token Source](docs/adding-a-token-source.md) — guide for contributors
+- [Security Model](docs/architecture/security-model.md) — what is stored where, threat model, prompt injection analysis
+- [Configuration Reference](docs/architecture/configuration-reference.md) — all `launcher.json` fields
+- [WSL Setup](docs/setup/wsl-setup.md) — how to use Windows Credential Manager from WSL
+- [Adding a Token Source](docs/architecture/adding-a-token-source.md) — guide for contributors
 
 ---
 
