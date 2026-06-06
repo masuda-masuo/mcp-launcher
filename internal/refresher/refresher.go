@@ -23,7 +23,7 @@ type Refresher struct {
 	tokenKey string
 }
 
-func New(store keystore.Store, source config.TokenSource, tokenKey string) (*Refresher, error) {
+func New(ctx context.Context, store keystore.Store, source config.TokenSource, tokenKey string) (*Refresher, error) {
 	var fetcher TokenFetcher
 	var err error
 
@@ -33,7 +33,7 @@ func New(store keystore.Store, source config.TokenSource, tokenKey string) (*Ref
 	case "aws_sts":
 		// Extract the target_env_key to use as prefix for multi-credential storage
 		targetEnvKey := source.TargetEnvKey
-		fetcher, err = awssts.NewFetcher(store, source.RoleARNKey, source.RoleSessionName, targetEnvKey, source.DurationSeconds)
+		fetcher, err = awssts.NewFetcher(context.Background(), store, source.RoleARNKey, source.RoleSessionName, targetEnvKey, source.DurationSeconds)
 		if err != nil {
 			return nil, fmt.Errorf("creating aws_sts fetcher: %w", err)
 		}
