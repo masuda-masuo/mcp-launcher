@@ -259,16 +259,14 @@ func runRegister(args []string) error {
 // configFilePath resolves the launcher.json path with the following priority:
 //  1. MCP_LAUNCHER_CONFIG environment variable (explicit override)
 //  2. Same directory as the mcp-launcher executable
+//  3. Current working directory (fallback)
 func configFilePath() string {
 	if p := os.Getenv("MCP_LAUNCHER_CONFIG"); p != "" {
 		return p
 	}
 	exe, err := os.Executable()
 	if err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), defaultConfigName)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
+		return filepath.Join(filepath.Dir(exe), defaultConfigName)
 	}
 	return defaultConfigName
 }
