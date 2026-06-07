@@ -35,7 +35,7 @@ Your config files contain **no secrets**. In Phase 2, mcp-launcher also acts as 
 
 **Phase 1** — No secrets in config files or chat logs. Works with any MCP server, no modifications required.
 
-**Phase 2** — Short-lived tokens (max 1 hour). Transparent refresh: mcp-launcher proxies the MCP stream and restarts the server with a fresh token without the AI tool noticing.
+**Phase 2** ⭐ **Recommended** — Short-lived tokens (max 1 hour). Transparent refresh: mcp-launcher proxies the MCP stream and restarts the server with a fresh token without the AI tool noticing. Long-lived credentials never need to be registered in the keystore.
 
 ---
 
@@ -60,14 +60,73 @@ sudo apt install libsecret-1-0 gnome-keyring
 
 ---
 
-## Quick Start: Phase 1 (Static PAT)
+## Quick Start: Phase 2 (Recommended)
 
-> Copy [`launcher.example.json`](launcher.example.json) to `launcher.json` and adjust paths. Keep `launcher.json` out of version control.
+Phase 2 uses short-lived tokens that expire in at most 1 hour and are refreshed automatically. Long-lived credentials stay in the standard credential chain and are never stored in the launcher keystore.
 
-**1. Register your token**
+- **[GitHub App setup →](docs/setup/github-app-setup.md)**
+- **[AWS STS setup →](docs/setup/aws-sts-setup.md)**
+
+### Example: AWS STS
+
+**1. Register the IAM Role ARN**
 
 ```bash
-mcp-launcher register github GITHUB_PERSONAL_ACCESS_TOKEN ghp_yourtoken
+mcp-launcher register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRole
+```
+
+**2. Create `launcher.json`** (place in the same directory as `mcp-launcher.exe`)
+
+```json
+{
+  "my-aws-mcp": {
+    "command": "C:\\path\\to\\aws-mcp-server.exe",
+    "args": [],
+    "env_keys": {
+      "AWS":                   "AWS_ACCESS_KEY_ID",
+      "AWS_ACCESS_KEY_ID":     "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
+      "AWS_SESSION_TOKEN":     "AWS_SESSION_TOKEN"
+    },
+    "token_source": {
+      "type": "aws_sts",
+      "role_arn_key": "mcp-launcher/my-aws-mcp/ROLE_ARN",
+      "role_session_name": "mcp-launcher-my-aws-mcp",
+      "duration_seconds": 3600,
+      "target_env_key": "AWS",
+      "refresh_before_seconds": 600
+    },
+    "check_interval_seconds": 60,
+    "drain_timeout_seconds": 30
+  }
+}
+```
+
+**3. Configure Claude Desktop**
+
+```json
+{
+  "mcpServers": {
+    "my-aws-mcp": {
+      "command": "C:\\path\\to\\mcp-launcher.exe",
+      "args": ["my-aws-mcp"]
+    }
+  }
+}
+```
+
+> **Note (Windows)**: Claude Desktop does not inherit the system PATH, so use the full absolute path to executables.
+>
+> **Note**: `launcher.json` is automatically loaded from the same directory as `mcp-launcher.exe`. No extra configuration needed.
+
+### Example: GitHub App
+
+**1. Register GitHub App credentials**
+
+```bash
+mcp-launcher register github APP_ID 123456
+mcp-launcher register github PRIVATE_KEY "$(cat private-key.pem)"
+mcp-launcher register github INSTALLATION_ID 78901234
 ```
 
 **2. Create `launcher.json`**
@@ -78,37 +137,28 @@ mcp-launcher register github GITHUB_PERSONAL_ACCESS_TOKEN ghp_yourtoken
     "command": "C:\\path\\to\\github-mcp-server.exe",
     "args": ["stdio"],
     "env_keys": {
-      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
-    }
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/github-app"
+    },
+    "token_source": {
+      "type": "github_app",
+      "app_id_key": "mcp-launcher/github/APP_ID",
+      "private_key_key": "mcp-launcher/github/PRIVATE_KEY",
+      "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
+      "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "refresh_before_seconds": 600
+    },
+    "check_interval_seconds": 60
   }
 }
 ```
-
-**3. Configure Claude Desktop**
-
-```json
-{
-  "mcpServers": {
-    "github": {
-      "command": "C:\\path\\to\\mcp-launcher.exe",
-      "args": ["github"]
-    }
-  }
-}
-```
-
-> **Note (Windows)**: Claude Desktop does not inherit the system PATH, so use the full absolute path to executables.
->
-> **Note**: The npm package `@modelcontextprotocol/server-github` is deprecated as of April 2025. Use the [official binary](https://github.com/github/github-mcp-server/releases) instead.
 
 ---
 
-## Phase 2: Short-lived Tokens
+## Phase 1: Static Token (Reference)
 
-Phase 2 replaces long-lived PATs with tokens that expire in at most 1 hour and are refreshed automatically.
+Phase 1 stores a long-lived token in the OS keystore and injects it at launch. No rotation. Useful for MCP servers that don't support short-lived tokens.
 
-- **[GitHub App setup →](docs/setup/github-app-setup.md)**
-- **[AWS STS setup →](docs/setup/aws-sts-setup.md)**
+See [Phase 1 reference →](docs/setup/phase1-static-token.md)
 
 ---
 
