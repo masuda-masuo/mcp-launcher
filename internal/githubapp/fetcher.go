@@ -102,8 +102,10 @@ func (f *Fetcher) generateJWT(appID int64, privateKeyPEM string) (string, error)
 
 	now := time.Now()
 	claims := jwt.MapClaims{
-		"iat": now.Unix(),
-		"exp": now.Add(10 * time.Minute).Unix(),
+		// Backdate iat by 60 seconds to tolerate clock skew between
+		// the local machine and GitHub's servers.
+		"iat": now.Add(-60 * time.Second).Unix(),
+		"exp": now.Add(9 * time.Minute).Unix(),
 		"iss": appID,
 	}
 
