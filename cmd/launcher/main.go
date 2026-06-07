@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	defaultConfigPath = "launcher.json"
+	defaultConfigName = "launcher.json"
 
 	warmUpTimeout = 5 * time.Second
 )
@@ -255,9 +256,19 @@ func runRegister(args []string) error {
 	return nil
 }
 
+// configFilePath resolves the launcher.json path with the following priority:
+//  1. MCP_LAUNCHER_CONFIG environment variable (explicit override)
+//  2. Same directory as the mcp-launcher executable
 func configFilePath() string {
 	if p := os.Getenv("MCP_LAUNCHER_CONFIG"); p != "" {
 		return p
 	}
-	return defaultConfigPath
+	exe, err := os.Executable()
+	if err == nil {
+		candidate := filepath.Join(filepath.Dir(exe), defaultConfigName)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	return defaultConfigName
 }
