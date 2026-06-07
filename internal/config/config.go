@@ -24,7 +24,7 @@ type TokenSource struct {
 type ServiceConfig struct {
 	Command               string            `json:"command"`
 	Args                  []string          `json:"args"`
-	EnvKeys               map[string]string `json:"env_keys"`
+	EnvKeys               map[string]string `json:"env_keys,omitempty"`
 	TokenSource           *TokenSource      `json:"token_source,omitempty"`
 	CheckIntervalSeconds  int               `json:"check_interval_seconds,omitempty"`
 	DrainTimeoutSeconds   int               `json:"drain_timeout_seconds,omitempty"`
@@ -58,8 +58,9 @@ func (c Config) validate() error {
 		if svc.Command == "" {
 			return fmt.Errorf("service %q: missing required field 'command'", name)
 		}
-		if len(svc.EnvKeys) == 0 {
-			return fmt.Errorf("service %q: missing required field 'env_keys'", name)
+		// env_keys is required only when token_source is present
+		if svc.TokenSource != nil && len(svc.EnvKeys) == 0 {
+			return fmt.Errorf("service %q: missing required field 'env_keys' (required when token_source is set)", name)
 		}
 	}
 	return nil
