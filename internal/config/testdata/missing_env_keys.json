@@ -1,5 +1,13 @@
 {
   "github": {
-    "command": "github-mcp-server"
+    "command": "github-mcp-server",
+    "token_source": {
+      "type": "github_app",
+      "app_id_key": "mcp-launcher/github/APP_ID",
+      "private_key_key": "mcp-launcher/github/PRIVATE_KEY",
+      "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
+      "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "refresh_before_seconds": 600
+    }
   }
 }
