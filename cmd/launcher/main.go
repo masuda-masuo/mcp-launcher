@@ -112,9 +112,19 @@ func buildEnv(svc config.ServiceConfig, store keystore.Store, serviceName string
 	return env, nil
 }
 
+// resolveCommand resolves command using exec.LookPath, which searches PATH.
+// On Windows where PATH may be incomplete (e.g., launched from Claude Desktop),
+// this ensures the executable is found using the current process's environment
+// before falling back to the original command.
+func resolveCommand(command string) string {
+	if lp, err := exec.LookPath(command); err == nil {
+		return lp
+	}
+	return command
+}
+
 func runChildOnce(svc config.ServiceConfig, env []string) error {
-	args := append([]string{svc.Command}, svc.Args...)
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command(resolveCommand(svc.Command), svc.Args...)
 	cmd.Env = env
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -164,8 +174,7 @@ func runChildWithRestart(ctx context.Context, svc config.ServiceConfig, store ke
 			}
 		}
 
-		args := append([]string{svc.Command}, svc.Args...)
-		cmd := exec.Command(args[0], args[1:]...)
+		cmd := exec.Command(resolveCommand(svc.Command), svc.Args...)
 		cmd.Env = env
 		cmd.Stderr = os.Stderr
 		stdin, err := cmd.StdinPipe()
