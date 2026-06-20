@@ -171,14 +171,6 @@ See [Phase 1 reference →](docs/setup/phase1-static-token.md)
 
 ---
 
-## Community
-
-Discussed in the MCP community:
-
-- 💡 [Ideas - Security: mcp-launcher](https://github.com/modelcontextprotocol/modelcontextprotocol/discussions/2849) _(modelcontextprotocol/modelcontextprotocol)_
-
----
-
 ## License
 
 MIT
