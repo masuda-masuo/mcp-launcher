@@ -120,6 +120,7 @@ func resolveCommand(command string) string {
 	if lp, err := exec.LookPath(command); err == nil {
 		return lp
 	}
+	fmt.Fprintf(os.Stderr, "warning: command %q not found in PATH (will use as-is)\n", command)
 	return command
 }
 
