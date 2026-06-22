@@ -47,7 +47,14 @@ jobs:
             -description="Secure MCP server launcher with token rotation" \
             -company="masuda-masuo" \
             -copyright="MIT License" \
-            -ver=${{ github.ref_name }} \
+            -ver-major="$MAJ" \
+            -ver-minor="$MIN" \
+            -ver-patch="$PATCH" \
+            -product-ver-major="$MAJ" \
+            -product-ver-minor="$MIN" \
+            -product-ver-patch="$PATCH" \
+            -file-version="${{ github.ref_name }}" \
+            -product-version="${{ github.ref_name }}" \
             -platform-specific
 
       - name: Build (non-Windows)
