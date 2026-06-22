@@ -37,6 +37,9 @@ launcher.json
 launcher*.json
 !launcher.example.json
 
+# goversioninfo output (generated, Windows-only)
+resource.syso
+
 # Editor/IDE
 # .idea/
 # .vscode/

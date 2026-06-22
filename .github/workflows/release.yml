@@ -38,7 +38,20 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build
+      - name: Generate Windows version info
+        if: matrix.goos == 'windows'
+        run: |
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+          goversioninfo \
+            -product-name="MCP Launcher" \
+            -description="Secure MCP server launcher with token rotation" \
+            -company="masuda-masuo" \
+            -copyright="MIT License" \
+            -ver=${{ github.ref_name }} \
+            -platform-specific
+
+      - name: Build (non-Windows)
+        if: matrix.goos != 'windows'
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -46,6 +59,18 @@ jobs:
         run: |
           go build \
             -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o dist/${{ matrix.asset_name }} \
+            ./cmd/launcher
+
+      - name: Build (Windows)
+        if: matrix.goos == 'windows'
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: |
+          go build \
+            -ldflags="-X main.version=${{ github.ref_name }}" \
             -o dist/${{ matrix.asset_name }} \
             ./cmd/launcher
 
