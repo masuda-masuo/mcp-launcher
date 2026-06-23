@@ -43,3 +43,8 @@ resource.syso
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# goversioninfo per-binary output (generated, Windows-only)
+resource_*.syso
+versioninfo.json
+**/versioninfo.json
