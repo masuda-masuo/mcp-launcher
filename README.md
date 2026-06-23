@@ -199,3 +199,6 @@ GITHUB_TOKEN_COMMAND="mcp-token github"
 Only `github_app` token sources are supported today. mcp-token is released
 independently of the launcher under the `mcp-token/vX.Y.Z` tag namespace, while
 the launcher keeps the bare `vX.Y.Z` namespace.
+
+The GitHub API timeout defaults to 30s and can be overridden with the
+`MCP_TOKEN_FETCH_TIMEOUT` environment variable (a Go duration such as `45s`).

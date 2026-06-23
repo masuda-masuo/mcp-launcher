@@ -17,8 +17,13 @@ import (
 // version independently of the launcher; see release.yml (issue #25).
 var version = "dev"
 
-// fetchTimeout bounds the GitHub API call that mints the installation token.
-const fetchTimeout = 30 * time.Second
+// defaultFetchTimeout bounds the GitHub API call that mints the installation
+// token. Override it with the MCP_TOKEN_FETCH_TIMEOUT env var (a Go duration
+// such as "45s") when the API is slow, without recompiling (issue #25 review).
+const defaultFetchTimeout = 30 * time.Second
+
+// fetchTimeoutEnv is the env var that overrides defaultFetchTimeout.
+const fetchTimeoutEnv = "MCP_TOKEN_FETCH_TIMEOUT"
 
 func main() {
 	args := os.Args[1:]
@@ -54,7 +59,23 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "Mints a fresh short-lived token for <service> using the credentials in\n")
 	fmt.Fprintf(w, "the OS keystore (the service token_source in launcher.json) and prints it\n")
 	fmt.Fprintf(w, "to stdout. Intended as a GITHUB_TOKEN_COMMAND provider for clients that\n")
-	fmt.Fprintf(w, "run outside mcp-launcher, e.g. a streamable-http MCP daemon (issue #25).\n")
+	fmt.Fprintf(w, "run outside mcp-launcher, e.g. a streamable-http MCP daemon (issue #25).\n\n")
+	fmt.Fprintf(w, "Env:\n")
+	fmt.Fprintf(w, "  MCP_TOKEN_FETCH_TIMEOUT  GitHub API timeout as a Go duration (default 30s).\n")
+}
+
+// resolveFetchTimeout returns the API timeout, applying the
+// MCP_TOKEN_FETCH_TIMEOUT override when it parses to a positive Go duration and
+// falling back to defaultFetchTimeout (with a warning to w) otherwise.
+func resolveFetchTimeout(env string, w io.Writer) time.Duration {
+	if env == "" {
+		return defaultFetchTimeout
+	}
+	if d, err := time.ParseDuration(env); err == nil && d > 0 {
+		return d
+	}
+	fmt.Fprintf(w, "warning: ignoring invalid %s %q; using %s\n", fetchTimeoutEnv, env, defaultFetchTimeout)
+	return defaultFetchTimeout
 }
 
 // run resolves the service config, mints a fresh token via the shared refresher,
@@ -81,7 +102,7 @@ func run(serviceName string, store keystore.Store, out io.Writer) error {
 		return fmt.Errorf("token_source.target_env_key %q not found in env_keys for service %q", svc.TokenSource.TargetEnvKey, serviceName)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), resolveFetchTimeout(os.Getenv(fetchTimeoutEnv), os.Stderr))
 	defer cancel()
 
 	r, err := refresher.New(ctx, store, *svc.TokenSource, tokenKey)
