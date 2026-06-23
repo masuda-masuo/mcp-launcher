@@ -174,3 +174,28 @@ See [Phase 1 reference →](docs/setup/phase1-static-token.md)
 ## License
 
 MIT
+
+## `mcp-token` — on-demand token broker
+
+`mcp-token` mints a fresh short-lived token for a configured service straight
+from the OS keystore and prints it to stdout. It reuses the same `launcher.json`
+`token_source` configuration as the launcher, so no extra setup is needed beyond
+`mcp-launcher register`.
+
+It exists for clients that run **outside** the launcher stdio proxy — most
+notably an MCP server running as a long-lived `streamable-http` daemon, where the
+launcher is no longer in the path to inject `GITHUB_TOKEN`. Such a client can
+fetch a fresh token on demand without ever holding the GitHub App private key
+(which stays in the keystore):
+
+```
+$ mcp-token github
+ghs_xxxxxxxxxxxxxxxxxxxx
+
+# e.g. as a token command for a downstream daemon (issue #25):
+GITHUB_TOKEN_COMMAND="mcp-token github"
+```
+
+Only `github_app` token sources are supported today. mcp-token is released
+independently of the launcher under the `mcp-token/vX.Y.Z` tag namespace, while
+the launcher keeps the bare `vX.Y.Z` namespace.

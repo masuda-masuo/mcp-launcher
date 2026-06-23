@@ -91,3 +91,24 @@ func (r *Refresher) refresh(ctx context.Context) error {
 
 	return nil
 }
+
+// NewWithFetcher constructs a Refresher around an already-built fetcher,
+// bypassing the token_source type switch in New. This is what makes the
+// token-minting path unit-testable with a fake fetcher (issue #25).
+func NewWithFetcher(store keystore.Store, fetcher TokenFetcher, source config.TokenSource, tokenKey string) *Refresher {
+	return &Refresher{
+		store:    store,
+		fetcher:  fetcher,
+		source:   source,
+		tokenKey: tokenKey,
+	}
+}
+
+// Token mints a fresh token via the configured fetcher and returns it,
+// bypassing the keystore-cached token/expiry that RunOnce maintains. It is the
+// on-demand path used by the mcp-token CLI to emit a short-lived credential to
+// stdout (issue #25): the long-lived secret (e.g. a GitHub App private key)
+// stays in the keystore and only the freshly minted token leaves the process.
+func (r *Refresher) Token(ctx context.Context) (string, time.Time, error) {
+	return r.fetcher.FetchToken(ctx)
+}

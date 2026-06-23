@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -18,8 +17,6 @@ import (
 )
 
 const (
-	defaultConfigName = "launcher.json"
-
 	warmUpTimeout = 5 * time.Second
 )
 
@@ -27,10 +24,13 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "Usage: mcp-launcher <service>\n")
 		fmt.Fprintf(os.Stderr, "       mcp-launcher register <service> <ENV_KEY> <value>\n")
+		fmt.Fprintf(os.Stderr, "       mcp-launcher version\n")
 		os.Exit(1)
 	}
 
 	switch os.Args[1] {
+	case "version", "-v", "--version":
+		fmt.Println(version)
 	case "register":
 		if err := runRegister(os.Args[2:]); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -45,7 +45,7 @@ func main() {
 }
 
 func runLaunch(serviceName string) error {
-	configPath := configFilePath()
+	configPath := config.DefaultPath()
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -264,19 +264,4 @@ func runRegister(args []string) error {
 	fmt.Printf("  Add to launcher.json under service %q:\n", service)
 	fmt.Printf("  \"env_keys\": { %q: %q }\n", envKey, storeKey)
 	return nil
-}
-
-// configFilePath resolves the launcher.json path with the following priority:
-//  1. MCP_LAUNCHER_CONFIG environment variable (explicit override)
-//  2. Same directory as the mcp-launcher executable
-//  3. Current working directory (fallback)
-func configFilePath() string {
-	if p := os.Getenv("MCP_LAUNCHER_CONFIG"); p != "" {
-		return p
-	}
-	exe, err := os.Executable()
-	if err == nil {
-		return filepath.Join(filepath.Dir(exe), defaultConfigName)
-	}
-	return defaultConfigName
 }

@@ -3,33 +3,35 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+      - "mcp-token/v*"
 
 permissions:
   contents: write
 
 jobs:
   build:
-    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
-            asset_name: mcp-launcher-linux-amd64
+            suffix: linux-amd64
           - goos: linux
             goarch: arm64
-            asset_name: mcp-launcher-linux-arm64
+            suffix: linux-arm64
           - goos: darwin
             goarch: amd64
-            asset_name: mcp-launcher-darwin-amd64
+            suffix: darwin-amd64
           - goos: darwin
             goarch: arm64
-            asset_name: mcp-launcher-darwin-arm64
+            suffix: darwin-arm64
           - goos: windows
             goarch: amd64
-            asset_name: mcp-launcher-windows-amd64.exe
+            suffix: windows-amd64
+            ext: .exe
 
     steps:
       - uses: actions/checkout@v4
@@ -38,20 +40,46 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # Map the pushed tag to a single component + version. The launcher keeps
+      # the bare vX.Y.Z namespace; mcp-token releases under mcp-token/vX.Y.Z so
+      # the two binaries version on independent schedules (issue #25).
+      - name: Resolve component from tag
+        id: comp
+        run: |
+          TAG="${{ github.ref_name }}"
+          case "$TAG" in
+            mcp-token/v*)
+              echo "name=mcp-token" >> "$GITHUB_OUTPUT"
+              echo "dir=cmd/mcp-token" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG#mcp-token/}" >> "$GITHUB_OUTPUT"
+              ;;
+            v*)
+              echo "name=mcp-launcher" >> "$GITHUB_OUTPUT"
+              echo "dir=cmd/launcher" >> "$GITHUB_OUTPUT"
+              echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::unrecognized tag $TAG"; exit 1 ;;
+          esac
+
+      # Windows Smart App Control blocks binaries that strip the symbol table
+      # (-s) and lack version-info resources (see #20, #21-24). For Windows we
+      # embed per-binary version info into the package dir and keep the symbols.
       - name: Generate Windows version info
         if: matrix.goos == 'windows'
+        working-directory: ${{ steps.comp.outputs.dir }}
         run: |
           go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
-          echo '{}' > versioninfo.json
-          REF="${{ github.ref_name }}"
-          VER="${REF#v}"
+          VER="${{ steps.comp.outputs.version }}"
+          VER="${VER#v}"
           MAJ="${VER%%.*}"
           REST="${VER#*.}"
           MIN="${REST%%.*}"
           PATCH="${REST#*.}"
+          echo "{}" > versioninfo.json
           goversioninfo \
-            -product-name="MCP Launcher" \
-            -description="Secure MCP server launcher with token rotation" \
+            -product-name="${{ steps.comp.outputs.name }}" \
+            -description="MCP credential tooling: ${{ steps.comp.outputs.name }}" \
             -company="masuda-masuo" \
             -copyright="MIT License" \
             -ver-major="$MAJ" \
@@ -60,39 +88,31 @@ jobs:
             -product-ver-major="$MAJ" \
             -product-ver-minor="$MIN" \
             -product-ver-patch="$PATCH" \
-            -file-version="${{ github.ref_name }}" \
-            -product-version="${{ github.ref_name }}" \
+            -file-version="${{ steps.comp.outputs.version }}" \
+            -product-version="${{ steps.comp.outputs.version }}" \
             -platform-specific
 
-      - name: Build (non-Windows)
-        if: matrix.goos != 'windows'
+      - name: Build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
+          CGO_ENABLED: "0"
         run: |
-          go build \
-            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
-            -o dist/${{ matrix.asset_name }} \
-            ./cmd/launcher
-
-      - name: Build (Windows)
-        if: matrix.goos == 'windows'
-        env:
-          GOOS: windows
-          GOARCH: amd64
-          CGO_ENABLED: 0
-        run: |
-          go build \
-            -ldflags="-X main.version=${{ github.ref_name }}" \
-            -o dist/${{ matrix.asset_name }} \
-            ./cmd/launcher
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            LDFLAGS="-X main.version=${{ steps.comp.outputs.version }}"
+          else
+            LDFLAGS="-s -w -X main.version=${{ steps.comp.outputs.version }}"
+          fi
+          mkdir -p dist
+          go build -ldflags="$LDFLAGS" \
+            -o "dist/${{ steps.comp.outputs.name }}-${{ matrix.suffix }}${{ matrix.ext }}" \
+            "./${{ steps.comp.outputs.dir }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.asset_name }}
+          name: ${{ steps.comp.outputs.name }}-${{ matrix.suffix }}
+          path: dist/${{ steps.comp.outputs.name }}-${{ matrix.suffix }}${{ matrix.ext }}
 
   release:
     name: Create Release
