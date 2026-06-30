@@ -202,3 +202,19 @@ the launcher keeps the bare `vX.Y.Z` namespace.
 
 The GitHub API timeout defaults to 30s and can be overridden with the
 `MCP_TOKEN_FETCH_TIMEOUT` environment variable (a Go duration such as `45s`).
+
+### Migration from `mcp-launcher/` keystore keys (v0.2.x)
+
+If you used `mcp-launcher register` from v0.2.x, your keystore keys use the
+`mcp-launcher/` prefix. To migrate:
+
+1. **Re-register secrets** with the new prefix:
+   ```bash
+   mcp-token register <service> <KEY> <value>
+   ```
+2. **Update `launcher.json`** — change all keystore key references from
+   `mcp-launcher/...` to `mcp-token/...` (e.g. `"mcp-launcher/github/APP_ID"`
+   → `"mcp-token/github/APP_ID"`).
+
+The old `mcp-launcher register` command still works with a deprecation warning
+but writes keys under the new `mcp-token/` prefix.
