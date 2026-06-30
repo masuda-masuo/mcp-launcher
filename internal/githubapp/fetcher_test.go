@@ -61,9 +61,9 @@ func TestGenerateJWT_InvalidPEM(t *testing.T) {
 func TestFetchToken_StoreErrors(t *testing.T) {
 	store := keystore.NewMemoryStore()
 	source := config.TokenSource{
-		AppIDKey:          "mcp-launcher/test/APP_ID",
-		PrivateKeyKey:     "mcp-launcher/test/PRIVATE_KEY",
-		InstallationIDKey: "mcp-launcher/test/INSTALLATION_ID",
+		AppIDKey:          "mcp-token/test/APP_ID",
+		PrivateKeyKey:     "mcp-token/test/PRIVATE_KEY",
+		InstallationIDKey: "mcp-token/test/INSTALLATION_ID",
 	}
 	fetcher := NewFetcher(store, source)
 

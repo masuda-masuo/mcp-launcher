@@ -20,7 +20,7 @@ func TestLoad_ValidConfig(t *testing.T) {
 	if svc.Command != "github-mcp-server" {
 		t.Errorf("expected command 'github-mcp-server', got %q", svc.Command)
 	}
-	if svc.EnvKeys["GITHUB_TOKEN"] != "mcp-launcher/github/GITHUB_TOKEN" {
+	if svc.EnvKeys["GITHUB_TOKEN"] != "mcp-token/github/GITHUB_TOKEN" {
 		t.Errorf("unexpected env_key value: %q", svc.EnvKeys["GITHUB_TOKEN"])
 	}
 	if svc.CheckIntervalSeconds != 60 {

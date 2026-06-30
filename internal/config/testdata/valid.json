@@ -3,15 +3,15 @@
     "command": "github-mcp-server",
     "args": ["--stdio"],
     "env_keys": {
-      "GITHUB_TOKEN": "mcp-launcher/github/GITHUB_TOKEN"
+      "GITHUB_TOKEN": "mcp-token/github/GITHUB_TOKEN"
     },
     "check_interval_seconds": 60
   },
   "aws": {
     "command": "aws-mcp-server",
     "env_keys": {
-      "AWS_ACCESS_KEY_ID": "mcp-launcher/aws/AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/aws/AWS_SECRET_ACCESS_KEY"
+      "AWS_ACCESS_KEY_ID": "mcp-token/aws/AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY": "mcp-token/aws/AWS_SECRET_ACCESS_KEY"
     }
   }
 }

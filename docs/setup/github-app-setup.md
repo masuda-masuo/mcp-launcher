@@ -56,9 +56,9 @@ The number at the end is your **Installation ID**.
 ## Step 4: Register secrets in the keystore
 
 ```bash
-mcp-launcher register github APP_ID 123456
-mcp-launcher register github PRIVATE_KEY "$(cat path/to/private-key.pem)"
-mcp-launcher register github INSTALLATION_ID 7654321
+mcp-token register github APP_ID 123456
+mcp-token register github PRIVATE_KEY "$(cat path/to/private-key.pem)"
+mcp-token register github INSTALLATION_ID 7654321
 ```
 
 ## Step 5: Update `launcher.json`
@@ -69,13 +69,13 @@ mcp-launcher register github INSTALLATION_ID 7654321
     "command": "C:\\path\\to\\github-mcp-server.exe",
     "args": ["stdio"],
     "env_keys": {
-      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/GITHUB_PERSONAL_ACCESS_TOKEN"
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-token/github/GITHUB_PERSONAL_ACCESS_TOKEN"
     },
     "token_source": {
       "type": "github_app",
-      "app_id_key": "mcp-launcher/github/APP_ID",
-      "private_key_key": "mcp-launcher/github/PRIVATE_KEY",
-      "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
+      "app_id_key": "mcp-token/github/APP_ID",
+      "private_key_key": "mcp-token/github/PRIVATE_KEY",
+      "installation_id_key": "mcp-token/github/INSTALLATION_ID",
       "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
     },
