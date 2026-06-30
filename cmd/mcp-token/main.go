@@ -37,6 +37,13 @@ func main() {
 			return
 		}
 	}
+	if len(args) >= 1 && args[0] == "register" {
+		if err := runRegister(args[1:]); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(args) != 1 {
 		usage(os.Stderr)
 		os.Exit(2)
@@ -55,11 +62,12 @@ func main() {
 
 func usage(w io.Writer) {
 	fmt.Fprintf(w, "Usage: mcp-token <service>\n")
+	fmt.Fprintf(w, "       mcp-token register <service> <ENV_KEY> <value>\n")
 	fmt.Fprintf(w, "       mcp-token version\n\n")
-	fmt.Fprintf(w, "Mints a fresh short-lived token for <service> using the credentials in\n")
-	fmt.Fprintf(w, "the OS keystore (the service token_source in launcher.json) and prints it\n")
-	fmt.Fprintf(w, "to stdout. Intended as a GITHUB_TOKEN_COMMAND provider for clients that\n")
-	fmt.Fprintf(w, "run outside mcp-launcher, e.g. a streamable-http MCP daemon (issue #25).\n\n")
+	fmt.Fprintf(w, "Mint:  mcp-token <service> prints a fresh short-lived token for <service>\n")
+	fmt.Fprintf(w, "       using the token_source in launcher.json (issue #25).\n\n")
+	fmt.Fprintf(w, "Register: mcp-token register stores a secret in the OS keystore\n")
+	fmt.Fprintf(w, "       under mcp-token/<service>/<ENV_KEY>.\n\n")
 	fmt.Fprintf(w, "Env:\n")
 	fmt.Fprintf(w, "  MCP_TOKEN_FETCH_TIMEOUT  GitHub API timeout as a Go duration (default 30s).\n")
 }
@@ -114,5 +122,27 @@ func run(serviceName string, store keystore.Store, out io.Writer) error {
 		return fmt.Errorf("minting token: %w", err)
 	}
 	fmt.Fprintln(out, token)
+	return nil
+}
+
+func runRegister(args []string) error {
+	if len(args) != 3 {
+		return fmt.Errorf("usage: mcp-token register <service> <ENV_KEY> <value>")
+	}
+	service, envKey, value := args[0], args[1], args[2]
+	storeKey := "mcp-token/" + service + "/" + envKey
+
+	store, err := keystore.NewOSStore()
+	if err != nil {
+		return fmt.Errorf("initializing keystore: %w", err)
+	}
+
+	if err := store.Set(storeKey, value); err != nil {
+		return fmt.Errorf("storing secret: %w", err)
+	}
+
+	fmt.Printf("✓ Registered %s → keystore key: %q\n", envKey, storeKey)
+	fmt.Printf("  Add to launcher.json under service %q:\n", service)
+	fmt.Printf("  \"env_keys\": { %q: %q }\n", envKey, storeKey)
 	return nil
 }

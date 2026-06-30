@@ -22,7 +22,7 @@ func (f fakeFetcher) FetchToken(context.Context) (string, time.Time, error) {
 
 func TestToken_ReturnsFreshlyMintedToken(t *testing.T) {
 	exp := time.Now().Add(time.Hour)
-	r := NewWithFetcher(keystore.NewMemoryStore(), fakeFetcher{token: "ghs_fresh", expiry: exp}, config.TokenSource{Type: "github_app"}, "mcp-launcher/test/GITHUB_TOKEN")
+	r := NewWithFetcher(keystore.NewMemoryStore(), fakeFetcher{token: "ghs_fresh", expiry: exp}, config.TokenSource{Type: "github_app"}, "mcp-token/test/GITHUB_TOKEN")
 	tok, gotExp, err := r.Token(context.Background())
 	if err != nil {
 		t.Fatalf("Token: %v", err)
@@ -47,11 +47,11 @@ func TestToken_PropagatesFetcherError(t *testing.T) {
 // write the cached token key that RunOnce maintains.
 func TestToken_DoesNotTouchKeystore(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	r := NewWithFetcher(store, fakeFetcher{token: "ghs_x", expiry: time.Now().Add(time.Hour)}, config.TokenSource{Type: "github_app"}, "mcp-launcher/test/GITHUB_TOKEN")
+	r := NewWithFetcher(store, fakeFetcher{token: "ghs_x", expiry: time.Now().Add(time.Hour)}, config.TokenSource{Type: "github_app"}, "mcp-token/test/GITHUB_TOKEN")
 	if _, _, err := r.Token(context.Background()); err != nil {
 		t.Fatalf("Token: %v", err)
 	}
-	if _, err := store.Get("mcp-launcher/test/GITHUB_TOKEN"); err == nil {
+	if _, err := store.Get("mcp-token/test/GITHUB_TOKEN"); err == nil {
 		t.Error("Token should not write the cached token key")
 	}
 }

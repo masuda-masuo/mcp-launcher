@@ -1,7 +1,7 @@
 {
   "github": {
     "env_keys": {
-      "GITHUB_TOKEN": "mcp-launcher/github"
+      "GITHUB_TOKEN": "mcp-token/github"
     }
   }
 }

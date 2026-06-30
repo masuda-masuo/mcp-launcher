@@ -72,7 +72,7 @@ Phase 2 uses short-lived tokens that expire in at most 1 hour and are refreshed 
 **1. Register the IAM Role ARN**
 
 ```bash
-mcp-launcher register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRole
+mcp-token register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRole
 ```
 
 **2. Create `launcher.json`** (place in the same directory as `mcp-launcher.exe`)
@@ -90,7 +90,7 @@ mcp-launcher register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRo
     },
     "token_source": {
       "type": "aws_sts",
-      "role_arn_key": "mcp-launcher/my-aws-mcp/ROLE_ARN",
+      "role_arn_key": "mcp-token/my-aws-mcp/ROLE_ARN",
       "role_session_name": "mcp-launcher-my-aws-mcp",
       "duration_seconds": 3600,
       "target_env_key": "AWS",
@@ -124,9 +124,9 @@ mcp-launcher register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRo
 **1. Register GitHub App credentials**
 
 ```bash
-mcp-launcher register github APP_ID 123456
-mcp-launcher register github PRIVATE_KEY "$(cat private-key.pem)"
-mcp-launcher register github INSTALLATION_ID 78901234
+mcp-token register github APP_ID 123456
+mcp-token register github PRIVATE_KEY "$(cat private-key.pem)"
+mcp-token register github INSTALLATION_ID 78901234
 ```
 
 **2. Create `launcher.json`**
@@ -137,13 +137,13 @@ mcp-launcher register github INSTALLATION_ID 78901234
     "command": "C:\\path\\to\\github-mcp-server.exe",
     "args": ["stdio"],
     "env_keys": {
-      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-launcher/github/github-app"
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "mcp-token/github/github-app"
     },
     "token_source": {
       "type": "github_app",
-      "app_id_key": "mcp-launcher/github/APP_ID",
-      "private_key_key": "mcp-launcher/github/PRIVATE_KEY",
-      "installation_id_key": "mcp-launcher/github/INSTALLATION_ID",
+      "app_id_key": "mcp-token/github/APP_ID",
+      "private_key_key": "mcp-token/github/PRIVATE_KEY",
+      "installation_id_key": "mcp-token/github/INSTALLATION_ID",
       "target_env_key": "GITHUB_PERSONAL_ACCESS_TOKEN",
       "refresh_before_seconds": 600
     },
@@ -180,7 +180,7 @@ MIT
 `mcp-token` mints a fresh short-lived token for a configured service straight
 from the OS keystore and prints it to stdout. It reuses the same `launcher.json`
 `token_source` configuration as the launcher, so no extra setup is needed beyond
-`mcp-launcher register`.
+`mcp-token register`.
 
 It exists for clients that run **outside** the launcher stdio proxy — most
 notably an MCP server running as a long-lived `streamable-http` daemon, where the
@@ -202,3 +202,19 @@ the launcher keeps the bare `vX.Y.Z` namespace.
 
 The GitHub API timeout defaults to 30s and can be overridden with the
 `MCP_TOKEN_FETCH_TIMEOUT` environment variable (a Go duration such as `45s`).
+
+### Migration from `mcp-launcher/` keystore keys (v0.2.x)
+
+If you used `mcp-launcher register` from v0.2.x, your keystore keys use the
+`mcp-launcher/` prefix. To migrate:
+
+1. **Re-register secrets** with the new prefix:
+   ```bash
+   mcp-token register <service> <KEY> <value>
+   ```
+2. **Update `launcher.json`** — change all keystore key references from
+   `mcp-launcher/...` to `mcp-token/...` (e.g. `"mcp-launcher/github/APP_ID"`
+   → `"mcp-token/github/APP_ID"`).
+
+The old `mcp-launcher register` command still works with a deprecation warning
+but writes keys under the new `mcp-token/` prefix.

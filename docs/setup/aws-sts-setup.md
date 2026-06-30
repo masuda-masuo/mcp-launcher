@@ -32,7 +32,7 @@ Attach only the permissions the MCP server actually needs (e.g. read-only Lambda
 ## Step 2: Register the IAM Role ARN in the keystore
 
 ```bash
-mcp-launcher register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRole
+mcp-token register my-aws-mcp ROLE_ARN arn:aws:iam::123456789012:role/MyMCPRole
 ```
 
 Only the Role ARN is registered. The base credentials (`~/.aws/credentials`) are never stored in the keystore.
@@ -54,7 +54,7 @@ Only the Role ARN is registered. The base credentials (`~/.aws/credentials`) are
     },
     "token_source": {
       "type": "aws_sts",
-      "role_arn_key": "mcp-launcher/my-aws-mcp/ROLE_ARN",
+      "role_arn_key": "mcp-token/my-aws-mcp/ROLE_ARN",
       "role_session_name": "mcp-launcher-my-aws-mcp",
       "duration_seconds": 3600,
       "target_env_key": "AWS",
@@ -68,7 +68,7 @@ Only the Role ARN is registered. The base credentials (`~/.aws/credentials`) are
 
 **Key points:**
 
-- `env_keys` — the key on the left must include `target_env_key` itself (e.g. `"AWS"`). The values on the right are the flat keystore key names that the STS fetcher writes to (e.g. `"AWS_ACCESS_KEY_ID"`, not `"mcp-launcher/my-aws-mcp/AWS_ACCESS_KEY_ID"`)
+- `env_keys` — the key on the left must include `target_env_key` itself (e.g. `"AWS"`). The values on the right are the flat keystore key names that the STS fetcher writes to (e.g. `"AWS_ACCESS_KEY_ID"`, not `"mcp-token/my-aws-mcp/AWS_ACCESS_KEY_ID"`)
 - `role_arn_key` — keystore key where the IAM Role ARN is stored (registered in Step 2)
 - `role_session_name` — appears in CloudTrail logs; use a unique name per service
 - `duration_seconds` — lifetime of the STS credentials (default: 3600; min: 900)
@@ -117,8 +117,8 @@ If you run multiple AWS MCP servers, each service should use its own `role_arn_k
 **1. Register long-lived credentials**
 
 ```bash
-mcp-launcher register my-aws-mcp AWS_ACCESS_KEY_ID AKIAIOSFODNN7EXAMPLE
-mcp-launcher register my-aws-mcp AWS_SECRET_ACCESS_KEY wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+mcp-token register my-aws-mcp AWS_ACCESS_KEY_ID AKIAIOSFODNN7EXAMPLE
+mcp-token register my-aws-mcp AWS_SECRET_ACCESS_KEY wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ```
 
 **2. `launcher.json`**
@@ -129,8 +129,8 @@ mcp-launcher register my-aws-mcp AWS_SECRET_ACCESS_KEY wJalrXUtnFEMI/K7MDENG/bPx
     "command": "C:\\path\\to\\aws-mcp-server.exe",
     "args": [],
     "env_keys": {
-      "AWS_ACCESS_KEY_ID":     "mcp-launcher/my-aws-mcp/AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY": "mcp-launcher/my-aws-mcp/AWS_SECRET_ACCESS_KEY"
+      "AWS_ACCESS_KEY_ID":     "mcp-token/my-aws-mcp/AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY": "mcp-token/my-aws-mcp/AWS_SECRET_ACCESS_KEY"
     }
   }
 }

@@ -11,7 +11,7 @@ import (
 
 func TestRunOnce_NoExpiryKey_FetchesToken(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	tokenKey := "mcp-launcher/test/MY_TOKEN"
+	tokenKey := "mcp-token/test/MY_TOKEN"
 
 	source := config.TokenSource{
 		Type:                 "github_app",
@@ -32,7 +32,7 @@ func TestRunOnce_NoExpiryKey_FetchesToken(t *testing.T) {
 
 func TestRunOnce_TokenStillValid_SkipsRefresh(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	tokenKey := "mcp-launcher/test/VALID_TOKEN"
+	tokenKey := "mcp-token/test/VALID_TOKEN"
 
 	store.Set(tokenKey, "ghs_validtoken")
 	store.Set(tokenKey+"_EXPIRY", time.Now().Add(1*time.Hour).UTC().Format(time.RFC3339))
@@ -59,7 +59,7 @@ func TestRunOnce_TokenStillValid_SkipsRefresh(t *testing.T) {
 
 func TestRunOnce_TokenExpired_Refreshes(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	tokenKey := "mcp-launcher/test/EXPIRED_TOKEN"
+	tokenKey := "mcp-token/test/EXPIRED_TOKEN"
 
 	store.Set(tokenKey, "ghs_expiredtoken")
 	store.Set(tokenKey+"_EXPIRY", time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
@@ -83,7 +83,7 @@ func TestRunOnce_TokenExpired_Refreshes(t *testing.T) {
 
 func TestRunOnce_RefreshBeforeSeconds(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	tokenKey := "mcp-launcher/test/ABOUT_TO_EXPIRE"
+	tokenKey := "mcp-token/test/ABOUT_TO_EXPIRE"
 
 	store.Set(tokenKey, "ghs_aboutexpire")
 	store.Set(tokenKey+"_EXPIRY", time.Now().Add(5*time.Minute).UTC().Format(time.RFC3339))
@@ -107,7 +107,7 @@ func TestRunOnce_RefreshBeforeSeconds(t *testing.T) {
 
 func TestRefresh_StoresTokenAndExpiry(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	tokenKey := "mcp-launcher/test/MY_TOKEN"
+	tokenKey := "mcp-token/test/MY_TOKEN"
 
 	source := config.TokenSource{
 		Type: "github_app",
@@ -152,7 +152,7 @@ func TestNew_UnknownType_ReturnsError(t *testing.T) {
 	source := config.TokenSource{
 		Type: "unknown_type",
 	}
-	_, err := New(context.Background(), store, source, "mcp-launcher/test/KEY")
+	_, err := New(context.Background(), store, source, "mcp-token/test/KEY")
 	if err == nil {
 		t.Fatal("expected error for unknown type")
 	}

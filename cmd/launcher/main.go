@@ -23,8 +23,8 @@ const (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "Usage: mcp-launcher <service>\n")
-		fmt.Fprintf(os.Stderr, "       mcp-launcher register <service> <ENV_KEY> <value>\n")
 		fmt.Fprintf(os.Stderr, "       mcp-launcher version\n")
+		fmt.Fprintf(os.Stderr, "\nUse mcp-token register <service> <ENV_KEY> <value> for keystore registration.\n")
 		os.Exit(1)
 	}
 
@@ -32,6 +32,7 @@ func main() {
 	case "version", "-v", "--version":
 		fmt.Println(version)
 	case "register":
+		fmt.Fprintf(os.Stderr, "warning: mcp-launcher register is deprecated; use mcp-token register instead\n")
 		if err := runRegister(os.Args[2:]); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -101,7 +102,7 @@ func buildEnv(svc config.ServiceConfig, store keystore.Store, serviceName string
 		if err != nil {
 			if keystore.IsNotFound(err) {
 				return nil, fmt.Errorf(
-					"secret %q not found in keystore — run: mcp-launcher register %s %s <value>",
+					"secret %q not found in keystore — run: mcp-token register %s %s <value>",
 					storeKey, serviceName, envKey,
 				)
 			}
@@ -246,10 +247,10 @@ func (c *execChild) Kill() error {
 
 func runRegister(args []string) error {
 	if len(args) != 3 {
-		return fmt.Errorf("usage: mcp-launcher register <service> <ENV_KEY> <value>")
+		return fmt.Errorf("usage: mcp-token register <service> <ENV_KEY> <value>")
 	}
 	service, envKey, value := args[0], args[1], args[2]
-	storeKey := "mcp-launcher/" + service + "/" + envKey
+	storeKey := "mcp-token/" + service + "/" + envKey
 
 	store, err := keystore.NewOSStore()
 	if err != nil {

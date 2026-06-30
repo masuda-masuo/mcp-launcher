@@ -26,7 +26,7 @@ func (m *mockSTSClient) AssumeRole(ctx context.Context, input *sts.AssumeRoleInp
 
 func TestNewFetcher_MissingRoleARN(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	roleARNKey := "mcp-launcher/test/MISSING_ROLE"
+	roleARNKey := "mcp-token/test/MISSING_ROLE"
 
 	_, err := NewFetcher(context.Background(), store, roleARNKey, "test-session", "TEST_AWS", 3600)
 	if err == nil {
@@ -36,7 +36,7 @@ func TestNewFetcher_MissingRoleARN(t *testing.T) {
 
 func TestNewFetcherWithClient_StoresCredentials(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	roleARNKey := "mcp-launcher/test/ROLE_ARN"
+	roleARNKey := "mcp-token/test/ROLE_ARN"
 	store.Set(roleARNKey, "arn:aws:iam::123456789012:role/TestRole")
 
 	// Create mock STS client that returns test credentials
@@ -103,7 +103,7 @@ func TestNewFetcherWithClient_StoresCredentials(t *testing.T) {
 
 func TestFetcher_TargetEnvKeyPrefix(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	roleARNKey := "mcp-launcher/test/ROLE_ARN"
+	roleARNKey := "mcp-token/test/ROLE_ARN"
 	store.Set(roleARNKey, "arn:aws:iam::123456789012:role/TestRole")
 
 	mockClient := &mockSTSClient{
@@ -160,7 +160,7 @@ func TestFetcher_TargetEnvKeyPrefix(t *testing.T) {
 
 func TestFetcher_DefaultDuration(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	roleARNKey := "mcp-launcher/test/ROLE_ARN"
+	roleARNKey := "mcp-token/test/ROLE_ARN"
 	store.Set(roleARNKey, "arn:aws:iam::123456789012:role/TestRole")
 
 	// Test with 0 duration (should default to 3600)
@@ -179,7 +179,7 @@ func TestFetcher_DefaultDuration(t *testing.T) {
 
 func TestFetcher_AssumeRoleError(t *testing.T) {
 	store := keystore.NewMemoryStore()
-	roleARNKey := "mcp-launcher/test/ROLE_ARN"
+	roleARNKey := "mcp-token/test/ROLE_ARN"
 	store.Set(roleARNKey, "arn:aws:iam::123456789012:role/TestRole")
 
 	// Mock that returns an error

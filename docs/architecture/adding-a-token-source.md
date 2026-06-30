@@ -174,7 +174,7 @@ func newFetcher(ctx context.Context, store keystore.Store, svc config.Service) (
     },
     "token_source": {
       "type": "your_provider",
-      "your_provider_key": "mcp-launcher/my-service/CREDENTIALS",
+      "your_provider_key": "mcp-token/my-service/CREDENTIALS",
       "target_env_key": "YOUR_TOKEN",
       "refresh_before_seconds": 600
     },

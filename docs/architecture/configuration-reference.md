@@ -43,7 +43,7 @@
 | `private_key_key` | ✅ | Keystore key where the GitHub App RSA private key (PEM) is stored |
 | `installation_id_key` | ✅ | Keystore key where the GitHub App Installation ID is stored |
 
-> **Security note**: These are keystore key names, not the secrets themselves. The actual values are registered via `mcp-launcher register` and never appear in `launcher.json`.
+> **Security note**: These are keystore key names, not the secrets themselves. The actual values are registered via `mcp-token register` and never appear in `launcher.json`.
 
 ### `type: "aws_sts"` fields
 

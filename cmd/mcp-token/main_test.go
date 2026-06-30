@@ -57,7 +57,7 @@ func TestRun_MissingTargetEnvKey(t *testing.T) {
 // mint: with an empty keystore the github_app fetcher fails reading APP_ID
 // before any network call, so this stays deterministic offline.
 func TestRun_MintFailsWithoutCredentials(t *testing.T) {
-	writeConfig(t, `{"csb":{"command":"x","env_keys":{"GITHUB_TOKEN":"mcp-launcher/csb/GITHUB_TOKEN"},"token_source":{"type":"github_app","target_env_key":"GITHUB_TOKEN","app_id_key":"mcp-launcher/csb/APP_ID","private_key_key":"mcp-launcher/csb/PRIVATE_KEY","installation_id_key":"mcp-launcher/csb/INSTALLATION_ID"}}}`)
+	writeConfig(t, `{"csb":{"command":"x","env_keys":{"GITHUB_TOKEN":"mcp-token/csb/GITHUB_TOKEN"},"token_source":{"type":"github_app","target_env_key":"GITHUB_TOKEN","app_id_key":"mcp-token/csb/APP_ID","private_key_key":"mcp-token/csb/PRIVATE_KEY","installation_id_key":"mcp-token/csb/INSTALLATION_ID"}}}`)
 	err := run("csb", keystore.NewMemoryStore(), &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "minting token") {
 		t.Fatalf("expected minting token error, got %v", err)
