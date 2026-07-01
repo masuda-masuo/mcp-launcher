@@ -35,6 +35,9 @@ func (m *MemoryStore) Set(key, value string) error {
 func (m *MemoryStore) Delete(key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if _, ok := m.data[key]; !ok {
+		return &ErrNotFound{Key: key}
+	}
 	delete(m.data, key)
 	return nil
 }

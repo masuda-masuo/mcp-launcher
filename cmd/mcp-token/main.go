@@ -57,6 +57,18 @@ func main() {
 		}
 		return
 	}
+	if len(args) >= 1 && args[0] == "delete" {
+		store, err := keystore.NewOSStore()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: initializing keystore: %v\n", err)
+			os.Exit(1)
+		}
+		if err := runDelete(args[1:], store, os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(args) != 1 {
 		usage(os.Stderr)
 		os.Exit(2)
@@ -77,6 +89,8 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "Usage: mcp-token <service>\n")
 	fmt.Fprintf(w, "       mcp-token register <service> <ENV_KEY> <value>\n")
 	fmt.Fprintf(w, "       mcp-token list [<service>]\n")
+	fmt.Fprintf(w, "       mcp-token delete <service> <KEY>\n")
+	fmt.Fprintf(w, "       mcp-token delete --all <service>\n")
 	fmt.Fprintf(w, "       mcp-token version\n\n")
 	fmt.Fprintf(w, "Mint:  mcp-token <service> prints a fresh short-lived token for <service>\n")
 	fmt.Fprintf(w, "       using the token_source in launcher.json (issue #25).\n\n")
@@ -84,6 +98,9 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "       under mcp-token/<service>/<ENV_KEY>.\n\n")
 	fmt.Fprintf(w, "List:    mcp-token list prints all registered keys.\n")
 	fmt.Fprintf(w, "       mcp-token list <service> prints keys for a specific service.\n\n")
+	fmt.Fprintf(w, "Delete:  mcp-token delete <service> <KEY> deletes a single key.\n")
+	fmt.Fprintf(w, "       mcp-token delete --all <service> deletes all keys for a service.\n")
+	fmt.Fprintf(w, "       Add --force to skip confirmation prompt.\n\n")
 	fmt.Fprintf(w, "Env:\n")
 	fmt.Fprintf(w, "  MCP_TOKEN_FETCH_TIMEOUT  GitHub API timeout as a Go duration (default 30s).\n")
 }
@@ -160,6 +177,81 @@ func runRegister(args []string) error {
 	fmt.Printf("✓ Registered %s → keystore key: %q\n", envKey, storeKey)
 	fmt.Printf("  Add to launcher.json under service %q:\n", service)
 	fmt.Printf("  \"env_keys\": { %q: %q }\n", envKey, storeKey)
+	return nil
+}
+
+func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: mcp-token delete <service> <KEY | --all>")
+	}
+
+	// --all <service> [--force]: delete all keys for a service
+	if args[0] == "--all" {
+		if len(args) < 2 {
+			return fmt.Errorf("usage: mcp-token delete --all <service>")
+		}
+		service := args[1]
+
+		// Collect keys for both current and legacy prefixes
+		prefixes := []string{"mcp-token/" + service + "/", "mcp-launcher/" + service + "/"}
+		var toDelete []string
+		for _, prefix := range prefixes {
+			ks, err := store.List(prefix)
+			if err != nil {
+				return fmt.Errorf("listing keys for %q: %w", service, err)
+			}
+			toDelete = append(toDelete, ks...)
+		}
+
+		if len(toDelete) == 0 {
+			fmt.Fprintln(out, "(no keys registered for "+service+")")
+			return nil
+		}
+
+		// --force skips confirmation
+		force := len(args) > 2 && args[2] == "--force"
+		if !force {
+			fmt.Fprintf(out, "Delete %d key(s) for service %q? (y/N): ", len(toDelete), service)
+			var answer string
+			if _, err := fmt.Fscanln(in, &answer); err != nil {
+				return fmt.Errorf("reading confirmation: %w", err)
+			}
+			if answer != "y" && answer != "Y" {
+				fmt.Fprintln(out, "cancelled")
+				return nil
+			}
+		}
+
+		for _, k := range toDelete {
+			if err := store.Delete(k); err != nil {
+				return fmt.Errorf("deleting %q: %w", k, err)
+			}
+		}
+		fmt.Fprintf(out, "✓ Deleted %d key(s) for service %q\n", len(toDelete), service)
+		return nil
+	}
+
+	// <service> <KEY>: single key deletion
+	if len(args) != 2 {
+		return fmt.Errorf("usage: mcp-token delete <service> <KEY | --all>")
+	}
+	service, key := args[0], args[1]
+	storeKey := "mcp-token/" + service + "/" + key
+
+	if err := store.Delete(storeKey); err != nil {
+		if !keystore.IsNotFound(err) {
+			return fmt.Errorf("deleting %q: %w", storeKey, err)
+		}
+		// Not found under mcp-token/, try legacy prefix
+		legacyKey := "mcp-launcher/" + service + "/" + key
+		if err2 := store.Delete(legacyKey); err2 != nil {
+			return fmt.Errorf("key %q not found for service %q", key, service)
+		}
+		fmt.Fprintf(out, "✓ Deleted %s\n", legacyKey)
+		return nil
+	}
+
+	fmt.Fprintf(out, "✓ Deleted %s\n", storeKey)
 	return nil
 }
 
