@@ -4,31 +4,41 @@ package keystore
 
 import (
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
-
-	"github.com/danieljoos/wincred"
 )
 
 func (o *osStore) List(prefix string) ([]string, error) {
-	creds, err := wincred.CredEnumerateW("mcp-launcher/*", 0)
+	cmd := exec.Command("cmdkey", "/list")
+	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("keystore list: enumerate: %w", err)
+		return nil, fmt.Errorf("keystore list: cmdkey: %w", err)
 	}
 
+	prefixMatch := "target=" + service + "/"
 	var keys []string
-	for _, cred := range creds {
-		targetName := cred.TargetName
-		parts := strings.SplitN(targetName, "/", 2)
-		if len(parts) != 2 {
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(strings.ToLower(line), "target:") {
 			continue
 		}
-		key := parts[1]
+		// Line format: "Target: LegacyGeneric:target=mcp-launcher/KEYNAME"
+		idx := strings.Index(line, prefixMatch)
+		if idx < 0 {
+			continue
+		}
+		key := line[idx+len(prefixMatch):]
+		// Remove trailing type info after potential newlines/spaces
+		key = strings.TrimRight(key, " \r")
 		if strings.HasPrefix(key, prefix) {
 			keys = append(keys, key)
 		}
 	}
 
+	if len(keys) == 0 {
+		return nil, nil
+	}
 	sort.Strings(keys)
 	return keys, nil
 }
