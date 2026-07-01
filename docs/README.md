@@ -61,3 +61,9 @@ WSL（Windows Subsystem for Linux）環境についての注意事項。
 - 新規追加のステップ（config フィールド追加 → fetcher 実装 → main.go への配線）
 - 追加チェックリスト
 - 将来の候補トークンソース（GCP / Azure / Vault 等）
+
+---
+
+## CLI Reference
+
+`mcp-token` CLI のコマンド一覧は [README > mcp-token](../README.md#mcp-token--on-demand-token-broker--keystore-cli) を参照してください。
