@@ -11,6 +11,8 @@
 # Build output
 mcp-launcher
 mcp-launcher-*
+mcp-token
+mcp-token.exe
 dist/
 
 # Test binary, built with `go test -c`

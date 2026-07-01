@@ -30,7 +30,7 @@ func (o *osStore) List(prefix string) ([]string, error) {
 
 	var keys []string
 	for _, p := range append(unlocked, locked...) {
-			item := conn.Object("org.freedesktop.secrets", p)
+		item := conn.Object("org.freedesktop.secrets", p)
 		var itemAttrs map[string]string
 		err := item.Call("org.freedesktop.DBus.Properties.Get", 0,
 			"org.freedesktop.secrets.Item", "Attributes").Store(&itemAttrs)
