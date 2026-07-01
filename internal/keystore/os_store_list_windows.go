@@ -31,8 +31,11 @@ func (o *osStore) List(prefix string) ([]string, error) {
 		key := line[idx+len(prefixMatch):]
 		// Remove trailing type info after potential newlines/spaces
 		key = strings.TrimRight(key, " \r")
-		if strings.HasPrefix(key, prefix) {
-			keys = append(keys, key)
+		// cmdkey /list returns only the relative key (e.g. "github/APP_ID"),
+		// not the full key. Reconstruct with service prefix.
+		fullKey := service + "/" + key
+		if strings.HasPrefix(fullKey, prefix) {
+			keys = append(keys, fullKey)
 		}
 	}
 
