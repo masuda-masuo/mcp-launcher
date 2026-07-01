@@ -175,3 +175,148 @@ func TestRunList_Dedup(t *testing.T) {
 		t.Fatalf("expected 1 line (deduped), got %d: %v", len(lines), lines)
 	}
 }
+
+func TestRunDelete_SingleKey(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+
+	var buf bytes.Buffer
+	err := runDelete([]string{"github", "APP_ID"}, store, nil, &buf)
+	if err != nil {
+		t.Fatalf("runDelete failed: %v", err)
+	}
+	out := strings.TrimSpace(buf.String())
+	if !strings.Contains(out, "✓ Deleted") {
+		t.Errorf("expected success message, got %q", out)
+	}
+	if !strings.Contains(out, "mcp-token/github/APP_ID") {
+		t.Errorf("expected key name in output, got %q", out)
+	}
+	// Verify it is actually deleted from the store
+	if _, err := store.Get("mcp-token/github/APP_ID"); !keystore.IsNotFound(err) {
+		t.Errorf("expected key to be deleted from store, got %v", err)
+	}
+}
+
+func TestRunDelete_SingleKey_LegacyPrefix(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+
+	var buf bytes.Buffer
+	err := runDelete([]string{"github", "APP_ID"}, store, nil, &buf)
+	if err != nil {
+		t.Fatalf("runDelete failed: %v", err)
+	}
+	out := strings.TrimSpace(buf.String())
+	if !strings.Contains(out, "✓ Deleted") {
+		t.Errorf("expected success message, got %q", out)
+	}
+	if !strings.Contains(out, "mcp-launcher/github/APP_ID") {
+		t.Errorf("expected legacy key name in output, got %q", out)
+	}
+}
+
+func TestRunDelete_NotFound(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	var buf bytes.Buffer
+	err := runDelete([]string{"github", "NONEXISTENT"}, store, nil, &buf)
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected not found error, got %v", err)
+	}
+}
+
+func TestRunDelete_UsageError(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	var buf bytes.Buffer
+
+	// No args
+	err := runDelete(nil, store, nil, &buf)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got %v", err)
+	}
+
+	// Single arg (not --all)
+	err = runDelete([]string{"github"}, store, nil, &buf)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got %v", err)
+	}
+}
+
+func TestRunDelete_All(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+	store.Set("mcp-token/github/PRIVATE_KEY", "abc")
+	store.Set("mcp-token/csb/TOKEN", "xyz")
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runDelete([]string{"--all", "github"}, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runDelete --all failed: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Deleted 2 key(s)") {
+		t.Errorf("expected 2 keys deleted, got %q", out)
+	}
+	// Verify github keys are deleted
+	if _, err := store.Get("mcp-token/github/APP_ID"); !keystore.IsNotFound(err) {
+		t.Errorf("expected APP_ID to be deleted")
+	}
+	if _, err := store.Get("mcp-token/github/PRIVATE_KEY"); !keystore.IsNotFound(err) {
+		t.Errorf("expected PRIVATE_KEY to be deleted")
+	}
+	// csb key should remain
+	if v, err := store.Get("mcp-token/csb/TOKEN"); err != nil {
+		t.Errorf("expected csb/TOKEN to remain, got %v", err)
+	} else if v != "xyz" {
+		t.Errorf("expected csb/TOKEN value to be 'xyz', got %q", v)
+	}
+}
+
+func TestRunDelete_All_Cancelled(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+
+	var buf bytes.Buffer
+	in := strings.NewReader("n\n")
+	err := runDelete([]string{"--all", "github"}, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runDelete --all failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "cancelled") {
+		t.Errorf("expected cancelled message, got %q", buf.String())
+	}
+	// Key should still exist
+	if _, err := store.Get("mcp-token/github/APP_ID"); err != nil {
+		t.Errorf("expected key to remain after cancellation, got %v", err)
+	}
+}
+
+func TestRunDelete_All_Empty(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	var buf bytes.Buffer
+	err := runDelete([]string{"--all", "nonexistent"}, store, nil, &buf)
+	if err != nil {
+		t.Fatalf("runDelete --all failed: %v", err)
+	}
+	out := strings.TrimSpace(buf.String())
+	if !strings.Contains(out, "no keys registered") {
+		t.Errorf("expected no keys message, got %q", out)
+	}
+}
+
+func TestRunDelete_All_Force(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+	store.Set("mcp-token/github/PRIVATE_KEY", "abc")
+
+	var buf bytes.Buffer
+	// No stdin reader needed because --force skips confirmation
+	err := runDelete([]string{"--all", "github", "--force"}, store, nil, &buf)
+	if err != nil {
+		t.Fatalf("runDelete --all --force failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Deleted 2 key(s)") {
+		t.Errorf("expected 2 keys deleted, got %q", buf.String())
+	}
+}
