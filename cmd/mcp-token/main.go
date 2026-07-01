@@ -44,6 +44,18 @@ func main() {
 		}
 		return
 	}
+	if len(args) >= 1 && args[0] == "list" {
+		store, err := keystore.NewOSStore()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: initializing keystore: %v\n", err)
+			os.Exit(1)
+		}
+		if err := runList(args[1:], store, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(args) != 1 {
 		usage(os.Stderr)
 		os.Exit(2)
@@ -63,11 +75,14 @@ func main() {
 func usage(w io.Writer) {
 	fmt.Fprintf(w, "Usage: mcp-token <service>\n")
 	fmt.Fprintf(w, "       mcp-token register <service> <ENV_KEY> <value>\n")
+	fmt.Fprintf(w, "       mcp-token list [<service>]\n")
 	fmt.Fprintf(w, "       mcp-token version\n\n")
 	fmt.Fprintf(w, "Mint:  mcp-token <service> prints a fresh short-lived token for <service>\n")
 	fmt.Fprintf(w, "       using the token_source in launcher.json (issue #25).\n\n")
 	fmt.Fprintf(w, "Register: mcp-token register stores a secret in the OS keystore\n")
 	fmt.Fprintf(w, "       under mcp-token/<service>/<ENV_KEY>.\n\n")
+	fmt.Fprintf(w, "List:    mcp-token list prints all registered keys.\n")
+	fmt.Fprintf(w, "       mcp-token list <service> prints keys for a specific service.\n\n")
 	fmt.Fprintf(w, "Env:\n")
 	fmt.Fprintf(w, "  MCP_TOKEN_FETCH_TIMEOUT  GitHub API timeout as a Go duration (default 30s).\n")
 }
@@ -144,5 +159,24 @@ func runRegister(args []string) error {
 	fmt.Printf("✓ Registered %s → keystore key: %q\n", envKey, storeKey)
 	fmt.Printf("  Add to launcher.json under service %q:\n", service)
 	fmt.Printf("  \"env_keys\": { %q: %q }\n", envKey, storeKey)
+	return nil
+}
+
+func runList(args []string, store keystore.Store, out io.Writer) error {
+	prefix := "mcp-token/"
+	if len(args) > 0 {
+		prefix = "mcp-token/" + args[0] + "/"
+	}
+	keys, err := store.List(prefix)
+	if err != nil {
+		return fmt.Errorf("listing keys: %w", err)
+	}
+	if len(keys) == 0 {
+		fmt.Fprintln(out, "(no keys registered)")
+		return nil
+	}
+	for _, k := range keys {
+		fmt.Fprintln(out, k)
+	}
 	return nil
 }
