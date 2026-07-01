@@ -175,12 +175,11 @@ See [Phase 1 reference →](docs/setup/phase1-static-token.md)
 
 MIT
 
-## `mcp-token` — on-demand token broker
+## `mcp-token` — on-demand token broker & keystore CLI
 
-`mcp-token` mints a fresh short-lived token for a configured service straight
-from the OS keystore and prints it to stdout. It reuses the same `launcher.json`
-`token_source` configuration as the launcher, so no extra setup is needed beyond
-`mcp-token register`.
+`mcp-token` is a standalone CLI for managing keystore secrets and minting
+short-lived tokens. It shares the same `launcher.json` config and `token_source`
+logic as the launcher, so no extra setup is needed beyond registration.
 
 It exists for clients that run **outside** the launcher stdio proxy — most
 notably an MCP server running as a long-lived `streamable-http` daemon, where the
@@ -196,23 +195,45 @@ ghs_xxxxxxxxxxxxxxxxxxxx
 GITHUB_TOKEN_COMMAND="mcp-token github"
 ```
 
-Only `github_app` token sources are supported today. mcp-token is released
-independently of the launcher under the `mcp-token/vX.Y.Z` tag namespace, while
-the launcher keeps the bare `vX.Y.Z` namespace.
+### CLI Commands
 
-The GitHub API timeout defaults to 30s and can be overridden with the
-`MCP_TOKEN_FETCH_TIMEOUT` environment variable (a Go duration such as `45s`).
+| Command | Description |
+|---|---|
+| `mcp-token <service>` | Mint a fresh short-lived token for `<service>` and print to stdout. Only `github_app` token sources supported today. |
+| `mcp-token register <service> <KEY> <value>` | Store a secret under `mcp-token/<service>/<KEY>` in the OS keystore. |
+| `mcp-token list [<service>]` | List all registered keystore keys, optionally filtered by service. Searches both `mcp-token/` and `mcp-launcher/` prefixes (deduplicated) for backward compatibility. |
+| `mcp-token delete <service> <KEY>` | Delete a single key. Falls back to `mcp-launcher/` prefix if not found under `mcp-token/`. |
+| `mcp-token delete --all <service>` | Delete all keys for a service (with confirmation prompt). Use `--force` to skip confirmation. |
+| `mcp-token convert [<service>]` | Migrate keys from `mcp-launcher/` to `mcp-token/` prefix. With `--force`, skip confirmation. Converts all services, or a specific service. |
+| `mcp-token version` | Print the mcp-token version. |
+
+### Environment
+
+| Variable | Default | Description |
+|---|---|---|
+| `MCP_TOKEN_FETCH_TIMEOUT` | `30s` | GitHub API timeout as a Go duration (e.g. `45s`). |
+
+### Release tags
+
+`mcp-token` is released independently of the launcher under `mcp-token/vX.Y.Z`
+tag namespace, while the launcher keeps the bare `vX.Y.Z` namespace. Both
+binaries are built in the same release workflow.
 
 ### Migration from `mcp-launcher/` keystore keys (v0.2.x)
 
 If you used `mcp-launcher register` from v0.2.x, your keystore keys use the
 `mcp-launcher/` prefix. To migrate:
 
-1. **Re-register secrets** with the new prefix:
+1. **Automated** (recommended):
    ```bash
-   mcp-token register <service> <KEY> <value>
+   mcp-token convert          # all services, with confirmation
+   mcp-token convert --force  # skip confirmation
    ```
-2. **Update `launcher.json`** — change all keystore key references from
+2. **Manual** (per-service):
+   ```bash
+   mcp-token convert github   # convert only the "github" service
+   ```
+3. **Update `launcher.json`** — change all keystore key references from
    `mcp-launcher/...` to `mcp-token/...` (e.g. `"mcp-launcher/github/APP_ID"`
    → `"mcp-token/github/APP_ID"`).
 

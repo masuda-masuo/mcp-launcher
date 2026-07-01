@@ -35,9 +35,9 @@ C:\work\mcp\mcp-launcher.exe
 ### シークレットの登録（PowerShell）
 
 ```powershell
-C:\work\mcp\mcp-launcher.exe register github APP_ID 123456
-C:\work\mcp\mcp-launcher.exe register github INSTALLATION_ID 7654321
-C:\work\mcp\mcp-launcher.exe register github PRIVATE_KEY (Get-Content C:\path\to\private-key.pem -Raw)
+C:\work\mcp\mcp-token.exe register github APP_ID 123456
+C:\work\mcp\mcp-token.exe register github INSTALLATION_ID 7654321
+C:\work\mcp\mcp-token.exe register github PRIVATE_KEY (Get-Content C:\path\to\private-key.pem -Raw)
 ```
 
 シークレットは Windows Credential Manager に保存されます。
