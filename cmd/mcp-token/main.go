@@ -297,18 +297,14 @@ func runConvert(args []string, store keystore.Store, in io.Reader, out io.Writer
 	if len(args) > 1 {
 		return fmt.Errorf("usage: mcp-token convert [<service>]")
 	}
-	prefixes := []string{"mcp-launcher/"}
+	prefix := "mcp-launcher/"
 	if len(args) > 0 {
-		prefixes = []string{"mcp-launcher/" + args[0] + "/"}
+		prefix = "mcp-launcher/" + args[0] + "/"
 	}
 
-	var allOld []string
-	for _, prefix := range prefixes {
-		ks, err := store.List(prefix)
-		if err != nil {
-			return fmt.Errorf("listing legacy keys: %w", err)
-		}
-		allOld = append(allOld, ks...)
+	allOld, err := store.List(prefix)
+	if err != nil {
+		return fmt.Errorf("listing legacy keys: %w", err)
 	}
 	if len(allOld) == 0 {
 		fmt.Fprintln(out, "(no legacy keys to convert)")
@@ -332,8 +328,17 @@ func runConvert(args []string, store keystore.Store, in io.Reader, out io.Writer
 			fmt.Fprintf(out, "skipping %q: %v\n", oldKey, err)
 			continue
 		}
-		// mcp-launcher/<service>/<KEY> → mcp-token/<service>/<KEY>
 		newKey := "mcp-token/" + oldKey[len("mcp-launcher/"):]
+		// Check for existing key with different value before overwriting
+		if existing, err := store.Get(newKey); err == nil {
+			if existing != val {
+				fmt.Fprintf(out, "skipping %q → %q: target already exists with different value\n", oldKey, newKey)
+				continue
+			}
+			// Same value already at new key, just delete the old one
+			_ = store.Delete(oldKey)
+			continue
+		}
 		if err := store.Set(newKey, val); err != nil {
 			fmt.Fprintf(out, "error writing %q: %v\n", newKey, err)
 			continue

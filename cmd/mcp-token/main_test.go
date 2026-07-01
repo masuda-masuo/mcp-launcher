@@ -442,3 +442,52 @@ func TestRunConvert_UsageError(t *testing.T) {
 		t.Fatalf("expected usage error, got %v", err)
 	}
 }
+
+func TestRunConvert_SameValueAlreadyAtNewKey(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-token/github/APP_ID", "123") // same value already exists
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runConvert(nil, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	out := buf.String()
+	// It should silently delete the old key (same value already present)
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); !keystore.IsNotFound(err) {
+		t.Errorf("expected old key to be deleted")
+	}
+	if v, _ := store.Get("mcp-token/github/APP_ID"); v != "123" {
+		t.Errorf("expected new key to remain '123', got %q", v)
+	}
+	// Old key was deleted (cleanup), but no real conversion happened
+	if !strings.Contains(out, "Converted 0 key(s)") {
+		t.Errorf("expected 0 keys converted (value already present), got %q", out)
+	}
+}
+
+func TestRunConvert_ConflictingValueAtNewKey(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-token/github/APP_ID", "999") // different value already exists
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runConvert(nil, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	out := buf.String()
+	// Should skip — old key remains, new key unchanged
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); err != nil {
+		t.Errorf("expected old key to remain after skip")
+	}
+	if v, _ := store.Get("mcp-token/github/APP_ID"); v != "999" {
+		t.Errorf("expected new key to keep '999', got %q", v)
+	}
+	if !strings.Contains(out, "skipping") {
+		t.Errorf("expected skip message due to conflict, got %q", out)
+	}
+}
