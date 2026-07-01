@@ -8,7 +8,7 @@ package keystore
 #include <Security/Security.h>
 #include <stdlib.h>
 
-static CFArrayRef copy_all_matching(const char *service) {
+static void *copy_all_matching(const char *service) {
     CFStringRef svc = CFStringCreateWithCString(
         kCFAllocatorDefault, service, kCFStringEncodingUTF8);
     if (!svc) return NULL;
@@ -32,19 +32,19 @@ static CFArrayRef copy_all_matching(const char *service) {
     CFRelease(query);
     if (status == errSecItemNotFound) return NULL;
     if (status != errSecSuccess) return NULL;
-    return (CFArrayRef)result;
+    return (void *)result;
 }
 
-static long cfarray_count(CFArrayRef arr) {
-    return (long)CFArrayGetCount(arr);
+static long cfarray_count(void *arr) {
+    return (long)CFArrayGetCount((CFArrayRef)arr);
 }
 
-static CFDictionaryRef cfarray_get_dict(CFArrayRef arr, long idx) {
-    return (CFDictionaryRef)CFArrayGetValueAtIndex(arr, idx);
+static void *cfarray_get_dict(void *arr, long idx) {
+    return (void *)CFArrayGetValueAtIndex((CFArrayRef)arr, idx);
 }
 
-static char *copy_account_from_dict(CFDictionaryRef dict) {
-    CFStringRef acct = CFDictionaryGetValue(dict, kSecAttrAccount);
+static char *copy_account_from_dict(void *dict) {
+    CFStringRef acct = CFDictionaryGetValue((CFDictionaryRef)dict, kSecAttrAccount);
     if (!acct) return NULL;
     CFIndex len = CFStringGetLength(acct);
     CFIndex maxSize = CFStringGetMaximumSizeForEncoding(len, kCFStringEncodingUTF8) + 1;
