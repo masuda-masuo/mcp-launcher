@@ -185,6 +185,18 @@ func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer)
 		return fmt.Errorf("usage: mcp-token delete <service> <KEY | --all>")
 	}
 
+	// Extract --force from any position
+	force := false
+	var filtered []string
+	for _, a := range args {
+		if a == "--force" {
+			force = true
+		} else {
+			filtered = append(filtered, a)
+		}
+	}
+	args = filtered
+
 	// --all <service> [--force]: delete all keys for a service
 	if args[0] == "--all" {
 		if len(args) < 2 {
@@ -209,7 +221,6 @@ func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer)
 		}
 
 		// --force skips confirmation
-		force := len(args) > 2 && args[2] == "--force"
 		if !force {
 			fmt.Fprintf(out, "Delete %d key(s) for service %q? (y/N): ", len(toDelete), service)
 			var answer string
@@ -245,7 +256,7 @@ func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer)
 		// Not found under mcp-token/, try legacy prefix
 		legacyKey := "mcp-launcher/" + service + "/" + key
 		if err2 := store.Delete(legacyKey); err2 != nil {
-			return fmt.Errorf("key %q not found for service %q", key, service)
+			return fmt.Errorf("key %q not found for service %q (checked %q and %q)", key, service, storeKey, legacyKey)
 		}
 		fmt.Fprintf(out, "✓ Deleted %s\n", legacyKey)
 		return nil
