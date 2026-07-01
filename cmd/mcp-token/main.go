@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/masuda-masuo/mcp-launcher/internal/config"
@@ -163,18 +164,35 @@ func runRegister(args []string) error {
 }
 
 func runList(args []string, store keystore.Store, out io.Writer) error {
-	prefix := "mcp-token/"
+	// Search for both current (mcp-token/) and legacy (mcp-launcher/) prefixes
+	// for backward compatibility (issue #27 naming unification).
+	prefixes := []string{"mcp-token/"}
 	if len(args) > 0 {
-		prefix = "mcp-token/" + args[0] + "/"
+		prefixes = []string{"mcp-token/" + args[0] + "/", "mcp-launcher/" + args[0] + "/"}
+	} else {
+		prefixes = []string{"mcp-token/", "mcp-launcher/"}
 	}
-	keys, err := store.List(prefix)
-	if err != nil {
-		return fmt.Errorf("listing keys: %w", err)
+
+	seen := make(map[string]bool)
+	var keys []string
+	for _, prefix := range prefixes {
+		ks, err := store.List(prefix)
+		if err != nil {
+			return fmt.Errorf("listing keys: %w", err)
+		}
+		for _, k := range ks {
+			if !seen[k] {
+				seen[k] = true
+				keys = append(keys, k)
+			}
+		}
 	}
+
 	if len(keys) == 0 {
 		fmt.Fprintln(out, "(no keys registered)")
 		return nil
 	}
+	sort.Strings(keys)
 	for _, k := range keys {
 		fmt.Fprintln(out, k)
 	}

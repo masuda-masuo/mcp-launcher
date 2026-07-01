@@ -118,3 +118,60 @@ func TestRunList_FilterByService(t *testing.T) {
 		t.Errorf("expected github/APP_ID first, got %q", lines[0])
 	}
 }
+
+func TestRunList_LegacyPrefix(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+	store.Set("mcp-launcher/github/PRIVATE_KEY", "abc")
+
+	var buf bytes.Buffer
+	err := runList(nil, store, &buf)
+	if err != nil {
+		t.Fatalf("runList failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines (new + legacy), got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "mcp-launcher/github/PRIVATE_KEY" {
+		t.Errorf("expected legacy key first (sorted), got %q", lines[0])
+	}
+	if lines[1] != "mcp-token/github/APP_ID" {
+		t.Errorf("expected new key second (sorted), got %q", lines[1])
+	}
+}
+
+func TestRunList_LegacyPrefixFilterByService(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+	store.Set("mcp-launcher/csb/TOKEN", "xyz")
+
+	var buf bytes.Buffer
+	err := runList([]string{"github"}, store, &buf)
+	if err != nil {
+		t.Fatalf("runList failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "mcp-token/github/APP_ID" {
+		t.Errorf("expected github/APP_ID, got %q", lines[0])
+	}
+}
+
+func TestRunList_Dedup(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-token/github/APP_ID", "123")
+	store.Set("mcp-token/github/APP_ID", "123") // same key, redundant set
+
+	var buf bytes.Buffer
+	err := runList(nil, store, &buf)
+	if err != nil {
+		t.Fatalf("runList failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line (deduped), got %d: %v", len(lines), lines)
+	}
+}
