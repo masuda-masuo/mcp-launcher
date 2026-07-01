@@ -1,4 +1,4 @@
-//go:build !linux && !windows && !darwin
+//go:build (!darwin || !cgo) && !linux && !windows
 
 package keystore
 
