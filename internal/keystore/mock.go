@@ -1,6 +1,10 @@
 package keystore
 
-import "sync"
+import (
+	"sort"
+	"strings"
+	"sync"
+)
 
 type MemoryStore struct {
 	mu   sync.RWMutex
@@ -33,4 +37,17 @@ func (m *MemoryStore) Delete(key string) error {
 	defer m.mu.Unlock()
 	delete(m.data, key)
 	return nil
+}
+
+func (m *MemoryStore) List(prefix string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var keys []string
+	for k := range m.data {
+		if strings.HasPrefix(k, prefix) {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys, nil
 }

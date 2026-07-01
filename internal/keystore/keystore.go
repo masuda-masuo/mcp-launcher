@@ -6,6 +6,7 @@ type Store interface {
 	Get(key string) (string, error)
 	Set(key, value string) error
 	Delete(key string) error
+	List(prefix string) ([]string, error)
 }
 
 type ErrNotFound struct {
