@@ -45,6 +45,18 @@ func main() {
 		}
 		return
 	}
+	if len(args) >= 1 && args[0] == "convert" {
+		store, err := keystore.NewOSStore()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: initializing keystore: %v\n", err)
+			os.Exit(1)
+		}
+		if err := runConvert(args[1:], store, os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(args) >= 1 && args[0] == "list" {
 		store, err := keystore.NewOSStore()
 		if err != nil {
@@ -91,6 +103,7 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "       mcp-token list [<service>]\n")
 	fmt.Fprintf(w, "       mcp-token delete <service> <KEY>\n")
 	fmt.Fprintf(w, "       mcp-token delete --all <service>\n")
+	fmt.Fprintf(w, "       mcp-token convert [<service>]\n")
 	fmt.Fprintf(w, "       mcp-token version\n\n")
 	fmt.Fprintf(w, "Mint:  mcp-token <service> prints a fresh short-lived token for <service>\n")
 	fmt.Fprintf(w, "       using the token_source in launcher.json (issue #25).\n\n")
@@ -101,6 +114,9 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "Delete:  mcp-token delete <service> <KEY> deletes a single key.\n")
 	fmt.Fprintf(w, "       mcp-token delete --all <service> deletes all keys for a service.\n")
 	fmt.Fprintf(w, "       Add --force to skip confirmation prompt.\n\n")
+	fmt.Fprintf(w, "Convert: mcp-token convert migrates keys from mcp-launcher/ to\n")
+	fmt.Fprintf(w, "       mcp-token/ prefix. Supports --force to skip confirmation.\n")
+	fmt.Fprintf(w, "       mcp-token convert <service> converts only that service.\n\n")
 	fmt.Fprintf(w, "Env:\n")
 	fmt.Fprintf(w, "  MCP_TOKEN_FETCH_TIMEOUT  GitHub API timeout as a Go duration (default 30s).\n")
 }
@@ -263,6 +279,79 @@ func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer)
 	}
 
 	fmt.Fprintf(out, "✓ Deleted %s\n", storeKey)
+	return nil
+}
+
+func runConvert(args []string, store keystore.Store, in io.Reader, out io.Writer) error {
+	// --force from any position
+	force := false
+	var filtered []string
+	for _, a := range args {
+		if a == "--force" {
+			force = true
+		} else {
+			filtered = append(filtered, a)
+		}
+	}
+	args = filtered
+	if len(args) > 1 {
+		return fmt.Errorf("usage: mcp-token convert [<service>]")
+	}
+	prefix := "mcp-launcher/"
+	if len(args) > 0 {
+		prefix = "mcp-launcher/" + args[0] + "/"
+	}
+
+	allOld, err := store.List(prefix)
+	if err != nil {
+		return fmt.Errorf("listing legacy keys: %w", err)
+	}
+	if len(allOld) == 0 {
+		fmt.Fprintln(out, "(no legacy keys to convert)")
+		return nil
+	}
+	if !force {
+		fmt.Fprintf(out, "Convert %d key(s) from mcp-launcher/ to mcp-token/ prefix? (y/N): ", len(allOld))
+		var answer string
+		if _, err := fmt.Fscanln(in, &answer); err != nil {
+			return fmt.Errorf("reading confirmation: %w", err)
+		}
+		if answer != "y" && answer != "Y" {
+			fmt.Fprintln(out, "cancelled")
+			return nil
+		}
+	}
+	converted := 0
+	for _, oldKey := range allOld {
+		val, err := store.Get(oldKey)
+		if err != nil {
+			fmt.Fprintf(out, "skipping %q: %v\n", oldKey, err)
+			continue
+		}
+		newKey := "mcp-token/" + oldKey[len("mcp-launcher/"):]
+		// Check for existing key with different value before overwriting
+		if existing, err := store.Get(newKey); err == nil {
+			if existing != val {
+				fmt.Fprintf(out, "skipping %q → %q: target already exists with different value\n", oldKey, newKey)
+				continue
+			}
+			// Same value already at new key, just delete the old one
+			_ = store.Delete(oldKey)
+			fmt.Fprintf(out, "✓ %s → %s (already present, cleaned up)\n", oldKey, newKey)
+			continue
+		}
+		if err := store.Set(newKey, val); err != nil {
+			fmt.Fprintf(out, "error writing %q: %v\n", newKey, err)
+			continue
+		}
+		if err := store.Delete(oldKey); err != nil {
+			fmt.Fprintf(out, "warning: wrote %q but could not delete %q: %v\n", newKey, oldKey, err)
+			continue
+		}
+		fmt.Fprintf(out, "✓ %s → %s\n", oldKey, newKey)
+		converted++
+	}
+	fmt.Fprintf(out, "\nConverted %d key(s)\n", converted)
 	return nil
 }
 

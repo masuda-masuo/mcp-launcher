@@ -320,3 +320,174 @@ func TestRunDelete_All_Force(t *testing.T) {
 		t.Errorf("expected 2 keys deleted, got %q", buf.String())
 	}
 }
+
+func TestRunConvert_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	err := runConvert(nil, keystore.NewMemoryStore(), nil, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	out := strings.TrimSpace(buf.String())
+	if !strings.Contains(out, "no legacy keys") {
+		t.Errorf("expected no legacy keys message, got %q", out)
+	}
+}
+
+func TestRunConvert_All(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-launcher/github/PRIVATE_KEY", "abc")
+	store.Set("mcp-token/csb/TOKEN", "xyz") // already new prefix, should be untouched
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runConvert(nil, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Converted 2 key(s)") {
+		t.Errorf("expected 2 keys converted, got %q", out)
+	}
+	// Old keys should be deleted
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); !keystore.IsNotFound(err) {
+		t.Errorf("expected old key to be deleted")
+	}
+	// New keys should exist
+	if v, err := store.Get("mcp-token/github/APP_ID"); err != nil {
+		t.Errorf("expected new key, got %v", err)
+	} else if v != "123" {
+		t.Errorf("expected value 123, got %q", v)
+	}
+	if v, err := store.Get("mcp-token/github/PRIVATE_KEY"); err != nil {
+		t.Errorf("expected new key, got %v", err)
+	} else if v != "abc" {
+		t.Errorf("expected value abc, got %q", v)
+	}
+	// csb key should still exist
+	if _, err := store.Get("mcp-token/csb/TOKEN"); err != nil {
+		t.Errorf("expected csb/TOKEN to remain, got %v", err)
+	}
+}
+
+func TestRunConvert_SingleService(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-launcher/github/PRIVATE_KEY", "abc")
+	store.Set("mcp-launcher/csb/TOKEN", "xyz")
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runConvert([]string{"github"}, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Converted 2 key(s)") {
+		t.Errorf("expected 2 keys converted, got %q", buf.String())
+	}
+	// github keys should be migrated
+	if v, _ := store.Get("mcp-token/github/APP_ID"); v != "123" {
+		t.Errorf("expected github/APP_ID to be migrated")
+	}
+	// csb keys should remain as legacy
+	if _, err := store.Get("mcp-launcher/csb/TOKEN"); err != nil {
+		t.Errorf("expected csb/TOKEN to remain as legacy, got %v", err)
+	}
+}
+
+func TestRunConvert_Cancelled(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+
+	var buf bytes.Buffer
+	in := strings.NewReader("n\n")
+	err := runConvert(nil, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "cancelled") {
+		t.Errorf("expected cancelled message, got %q", buf.String())
+	}
+	// Old key should still exist
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); err != nil {
+		t.Errorf("expected legacy key to remain after cancellation, got %v", err)
+	}
+}
+
+func TestRunConvert_Force(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-launcher/github/PRIVATE_KEY", "abc")
+
+	var buf bytes.Buffer
+	// No stdin reader needed — --force skips confirmation
+	err := runConvert([]string{"--force"}, store, nil, &buf)
+	if err != nil {
+		t.Fatalf("runConvert --force failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Converted 2 key(s)") {
+		t.Errorf("expected 2 keys converted, got %q", buf.String())
+	}
+	// Verify deletion of old keys
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); !keystore.IsNotFound(err) {
+		t.Errorf("expected old key to be deleted")
+	}
+}
+
+func TestRunConvert_UsageError(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	var buf bytes.Buffer
+	err := runConvert([]string{"github", "extra"}, store, nil, &buf)
+	if err == nil || !strings.Contains(err.Error(), "usage") {
+		t.Fatalf("expected usage error, got %v", err)
+	}
+}
+
+func TestRunConvert_SameValueAlreadyAtNewKey(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-token/github/APP_ID", "123") // same value already exists
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runConvert(nil, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	out := buf.String()
+	// It should silently delete the old key (same value already present)
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); !keystore.IsNotFound(err) {
+		t.Errorf("expected old key to be deleted")
+	}
+	if v, _ := store.Get("mcp-token/github/APP_ID"); v != "123" {
+		t.Errorf("expected new key to remain '123', got %q", v)
+	}
+	// Old key was deleted (cleanup), but no real conversion happened
+	if !strings.Contains(out, "Converted 0 key(s)") {
+		t.Errorf("expected 0 keys converted (value already present), got %q", out)
+	}
+}
+
+func TestRunConvert_ConflictingValueAtNewKey(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	store.Set("mcp-launcher/github/APP_ID", "123")
+	store.Set("mcp-token/github/APP_ID", "999") // different value already exists
+
+	var buf bytes.Buffer
+	in := strings.NewReader("y\n")
+	err := runConvert(nil, store, in, &buf)
+	if err != nil {
+		t.Fatalf("runConvert failed: %v", err)
+	}
+	out := buf.String()
+	// Should skip — old key remains, new key unchanged
+	if _, err := store.Get("mcp-launcher/github/APP_ID"); err != nil {
+		t.Errorf("expected old key to remain after skip")
+	}
+	if v, _ := store.Get("mcp-token/github/APP_ID"); v != "999" {
+		t.Errorf("expected new key to keep '999', got %q", v)
+	}
+	if !strings.Contains(out, "skipping") {
+		t.Errorf("expected skip message due to conflict, got %q", out)
+	}
+}
