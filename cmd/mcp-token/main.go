@@ -337,6 +337,7 @@ func runConvert(args []string, store keystore.Store, in io.Reader, out io.Writer
 			}
 			// Same value already at new key, just delete the old one
 			_ = store.Delete(oldKey)
+			fmt.Fprintf(out, "✓ %s → %s (already present, cleaned up)\n", oldKey, newKey)
 			continue
 		}
 		if err := store.Set(newKey, val); err != nil {
