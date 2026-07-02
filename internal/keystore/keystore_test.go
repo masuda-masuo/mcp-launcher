@@ -2,6 +2,7 @@ package keystore
 
 import "testing"
 
+// TestMemoryStore_SetAndGet verifies basic Set/Get round-trip.
 func TestMemoryStore_SetAndGet(t *testing.T) {
 	s := NewMemoryStore()
 
