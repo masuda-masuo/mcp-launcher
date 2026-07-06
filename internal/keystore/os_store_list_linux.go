@@ -20,7 +20,7 @@ func (o *osStore) List(prefix string) ([]string, error) {
 
 	attrs := map[string]string{"service": service}
 	var unlocked, locked []dbus.ObjectPath
-	call := obj.Call("org.freedesktop.secrets.Service.SearchItems", 0, attrs)
+	call := obj.Call("org.freedesktop.Secret.Service.SearchItems", 0, attrs)
 	if call.Err != nil {
 		return nil, fmt.Errorf("keystore list: search: %w", call.Err)
 	}
@@ -33,7 +33,7 @@ func (o *osStore) List(prefix string) ([]string, error) {
 		item := conn.Object("org.freedesktop.secrets", p)
 		var itemAttrs map[string]string
 		err := item.Call("org.freedesktop.DBus.Properties.Get", 0,
-			"org.freedesktop.secrets.Item", "Attributes").Store(&itemAttrs)
+			"org.freedesktop.Secret.Item", "Attributes").Store(&itemAttrs)
 		if err != nil {
 			continue
 		}

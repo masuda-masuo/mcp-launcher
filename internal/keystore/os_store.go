@@ -3,7 +3,7 @@ package keystore
 import (
 	"fmt"
 
-	gokeyring "github.com/zalando/go-keyring"
+	gokeyring "github.com/masuda-masuo/mcp-launcher/internal/go-keyring"
 )
 
 const service = "mcp-launcher"
