@@ -37,7 +37,7 @@ func (o *osStore) List(prefix string) ([]string, error) {
 		if err != nil {
 			continue
 		}
-		user, ok := itemAttrs["user"]
+		user, ok := itemAttrs["username"]
 		if !ok {
 			continue
 		}
