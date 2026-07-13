@@ -17,7 +17,7 @@ Socket activation sidesteps both: nothing runs between connections, and the toke
 |---|---|
 | [`systemd/mcp-token.socket`](../../systemd/mcp-token.socket) | Listens on `%t/mcp-token/mint.sock` (`%t` = `/run/user/<uid>` in user scope). `Accept=yes`: one service instance per connection. |
 | [`systemd/mcp-token@.service`](../../systemd/mcp-token@.service) | Runs `mcp-token github` with stdin/stdout wired to the accepted connection. `StandardError=journal` keeps diagnostics out of the token stream. |
-| [`scripts/install-mint-socket.sh`](../../scripts/install-mint-socket.sh) | Resolves/installs the `mcp-token` binary, installs both units into `~/.config/systemd/user/`, and enables the socket. |
+| [`scripts/install-mint-socket.sh`](../../scripts/install-mint-socket.sh) | Resolves/installs the `mcp-token` binary and its `launcher.json` (`--bin` / `--config`, see "Configuration file resolution" below), installs both units into `~/.config/systemd/user/`, and enables the socket. |
 
 ## The socket contract
 
@@ -26,6 +26,51 @@ Socket activation sidesteps both: nothing runs between connections, and the toke
 3. The client reads until EOF and strips surrounding whitespace (`mcp-token`'s output is `fmt.Fprintln(out, token)`, i.e. the token plus a trailing newline).
 
 That's the entire protocol. No framing, no JSON, no auth handshake -- the socket's filesystem permissions (below) are the access control.
+
+## Configuration file resolution
+
+`mcp-token` (and the launcher) resolve `launcher.json` via
+`internal/config.DefaultPath()`, shared by every binary in this
+module:
+
+1. `MCP_LAUNCHER_CONFIG` environment variable (explicit override)
+2. the directory of the running executable (`os.Executable()` +
+   `launcher.json`)
+3. the current working directory (last-resort fallback)
+
+Under plain interactive use, rule 2 is fine: you run `mcp-token` from
+wherever you installed it, and its `launcher.json` sits right next to
+it. That's the layout the GCP VM uses (`/opt/mcp-launcher/bin/{mcp-token,
+launcher.json}`) and it's why `DefaultPath()` itself is not changed
+by the mint socket work -- other consumers still depend on it.
+
+Socket activation breaks that assumption. `mcp-token@.service` invokes
+the binary with no shell, no cwd of the caller's choosing, and no
+control over rule 3. Rule 2 becomes the only thing deciding "which
+config" -- and therefore which GitHub App key / keystore entry -- gets
+used, and that decision is now made by whichever of the resolution
+steps in `scripts/install-mint-socket.sh --bin` (`--bin` /
+`$MCP_TOKEN_EXE` / `$PATH` / `~/.local/bin/mcp-token` / a fresh pinned
+download) happened to find a binary first. A fresh install downloading
+to `~/.local/bin/mcp-token` has no `launcher.json` there at all, so
+rule 2 fails outright and the socket accepts connections that always
+fail to mint (`loading config: ... launcher.json: no such file`),
+discovered only at first connection, not at install time.
+
+`scripts/install-mint-socket.sh --config PATH` sidesteps this by
+setting `Environment=MCP_LAUNCHER_CONFIG=<path>` explicitly in the
+installed `mcp-token@.service`, i.e. by pinning rule 1 at install time
+instead of leaving the service to fall through to rule 2. The
+installer does this unconditionally, even when `--config` is omitted
+and it finds a `launcher.json` next to the resolved binary (the same
+directory rule 2 would land on) -- it writes that resolved path into
+`Environment=` explicitly rather than leaving the variable unset. That
+way `systemctl --user cat mcp-token@.service` alone tells you which
+config a running instance uses, without also having to go check where
+its binary happens to live. If neither `--config` nor an adjacent
+`launcher.json` is found, the installer fails at install time rather
+than installing a socket that is silently broken from the first
+connection onward.
 
 ## Consumers
 

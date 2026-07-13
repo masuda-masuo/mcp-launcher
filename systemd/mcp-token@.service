@@ -19,9 +19,21 @@
 # cannot resolve system units, and the dependency would fail the whole
 # activation job, not just degrade it.
 #
-# ExecStart= below is rewritten by scripts/install-mint-socket.sh to
-# point at the resolved mcp-token binary path; the placeholder is not
-# runnable as committed and this file should not be enabled by hand.
+# ExecStart= and Environment= below are rewritten by
+# scripts/install-mint-socket.sh to point at the resolved mcp-token
+# binary path and its launcher.json; the placeholders are not runnable
+# as committed and this file should not be enabled by hand.
+#
+# MCP_LAUNCHER_CONFIG is always written explicitly by the installer
+# (never left unset to fall back on internal/config.DefaultPath()'s
+# exe-adjacent rule), even when the resolved value is exactly the
+# launcher.json next to the binary. Socket activation makes "which
+# config" depend on wherever mcp-token's binary happened to be
+# resolved from (~/.local/bin, ~/shiori/runtime, /opt/mcp-launcher/bin,
+# ...); pinning it here means `systemctl --user cat mcp-token@.service`
+# alone tells you which config a running instance uses, instead of
+# also having to go check the binary's directory. See "Configuration
+# file resolution" in docs/architecture/mint-socket.md.
 
 [Unit]
 Description=Mint a GitHub token for one mcp-token.socket connection
@@ -33,4 +45,5 @@ Type=oneshot
 StandardInput=socket
 StandardOutput=socket
 StandardError=journal
+Environment=MCP_LAUNCHER_CONFIG=__MCP_LAUNCHER_CONFIG__
 ExecStart=__MCP_TOKEN_BIN__ github
