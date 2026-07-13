@@ -168,6 +168,7 @@ See [Phase 1 reference →](docs/setup/phase1-static-token.md)
 - [Configuration Reference](docs/architecture/configuration-reference.md) — all `launcher.json` fields
 - [WSL Setup](docs/setup/wsl-setup.md) — how to use Windows Credential Manager from WSL
 - [Adding a Token Source](docs/architecture/adding-a-token-source.md) — guide for contributors
+- [On-Demand Mint Socket](docs/architecture/mint-socket.md) — systemd socket-activated `mcp-token`, for consumers (sandboxes, `streamable-http` daemons) that can't shell out to the CLI themselves
 
 ---
 
@@ -206,6 +207,22 @@ GITHUB_TOKEN_COMMAND="mcp-token github"
 | `mcp-token delete --all <service>` | Delete all keys for a service (with confirmation prompt). Use `--force` to skip confirmation. |
 | `mcp-token convert [<service>]` | Migrate keys from `mcp-launcher/` to `mcp-token/` prefix. With `--force`, skip confirmation. Converts all services, or a specific service. |
 | `mcp-token version` | Print the mcp-token version. |
+
+### On-demand mint socket (systemd, Linux)
+
+For consumers that can't shell out to `mcp-token` directly (a sandboxed
+container, a long-lived `streamable-http` daemon), `mcp-token github` can be
+wired up behind a systemd-activated Unix socket instead: connecting mints a
+fresh token on the spot, with no daemon and no wall-clock refresh timer.
+
+```bash
+scripts/install-mint-socket.sh
+```
+
+installs and enables it in systemd user scope. See
+[On-Demand Mint Socket](docs/architecture/mint-socket.md) for the full
+contract, the security boundary, and consumer footguns worth reading before
+bind-mounting the socket into anything.
 
 ### Environment
 

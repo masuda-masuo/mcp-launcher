@@ -1,0 +1,36 @@
+# Instantiated once per connection to mcp-token.socket (Accept=yes).
+# Each instance runs `mcp-token github` exactly once, with stdin/stdout
+# wired directly to the accepted connection by systemd
+# (StandardInput=socket / StandardOutput=socket) -- no shell, no
+# buffering process, and no file on disk in between.
+#
+# StandardError=journal is load-bearing, not cosmetic: mcp-token's own
+# error/warning/log output must never reach the socket, or a client
+# reading "the token" could silently receive a mix of a token and
+# diagnostic text. cmd/mcp-token/main.go writes only the token line to
+# stdout for exactly this reason -- see the stdout-hygiene note in
+# docs/architecture/mint-socket.md if that ever regresses.
+#
+# gnome-keyring-daemon.service is Ubuntu's standard user unit
+# (/usr/lib/systemd/user/gnome-keyring-daemon.service), present in both
+# WSL and GCP VM environments this is deployed to. It is a user-scope
+# unit; do not point this Requires=/After= at a system-scope keyring
+# unit (e.g. a hypothetical mcp-keyring.service) -- a user manager
+# cannot resolve system units, and the dependency would fail the whole
+# activation job, not just degrade it.
+#
+# ExecStart= below is rewritten by scripts/install-mint-socket.sh to
+# point at the resolved mcp-token binary path; the placeholder is not
+# runnable as committed and this file should not be enabled by hand.
+
+[Unit]
+Description=Mint a GitHub token for one mcp-token.socket connection
+Requires=gnome-keyring-daemon.service
+After=gnome-keyring-daemon.service
+
+[Service]
+Type=oneshot
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+ExecStart=__MCP_TOKEN_BIN__ github

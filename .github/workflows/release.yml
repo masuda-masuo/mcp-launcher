@@ -127,6 +127,16 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # scripts/install-mint-socket.sh (issue mcp-launcher#25 follow-up:
+      # on-demand mint socket) downloads the mcp-token release binary
+      # anonymously and verifies it against this file before installing
+      # it -- sha256 verification is mandatory there, so every release
+      # from this point on must publish checksums.txt alongside its
+      # binaries.
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
