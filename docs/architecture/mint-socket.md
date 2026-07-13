@@ -19,6 +19,25 @@ Socket activation sidesteps both: nothing runs between connections, and the toke
 | [`systemd/mcp-token@.service`](../../systemd/mcp-token@.service) | Runs `mcp-token github` with stdin/stdout wired to the accepted connection. `StandardError=journal` keeps diagnostics out of the token stream. |
 | [`scripts/install-mint-socket.sh`](../../scripts/install-mint-socket.sh) | Resolves/installs the `mcp-token` binary and its `launcher.json` (`--bin` / `--config`, see "Configuration file resolution" below), installs both units into `~/.config/systemd/user/`, and enables the socket. |
 
+## Installing without a checkout (the kit)
+
+The installer copies the unit files out of `systemd/` rather than embedding
+them, so it is not a `curl | bash` script on its own. To install on a machine
+that has no checkout and no Go toolchain — a headless server, the dev-infra
+VM — take the **mint-socket kit** instead: every `mcp-token/vX.Y.Z` release
+publishes `mcp-token-mint-socket-<version>.tar.gz`, which unpacks to the same
+`scripts/` + `systemd/` layout the installer expects and is listed in the
+release's `checksums.txt`.
+
+The installer's `PINNED_VERSION` points at the release it ships in, so a kit
+unpacked from release X installs the `mcp-token` binary from release X, and the
+binary download is verified against that same `checksums.txt`. Nothing in this
+path needs a GitHub token — which is the point, since this is the tool that
+mints tokens (see "Security boundary"). Bump `PINNED_VERSION` in the commit
+that is about to be tagged, never after.
+
+See the README (`On-demand mint socket`) for the exact commands.
+
 ## The socket contract
 
 1. A client connects to the socket.

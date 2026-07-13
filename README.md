@@ -219,8 +219,24 @@ fresh token on the spot, with no daemon and no wall-clock refresh timer.
 scripts/install-mint-socket.sh
 ```
 
-installs and enables it in systemd user scope. See
-[On-Demand Mint Socket](docs/architecture/mint-socket.md) for the full
+installs and enables it in systemd user scope.
+
+On a machine with no checkout and no Go toolchain (a server, a VM), take the
+**mint-socket kit** published with every `mcp-token` release instead — it is
+the same installer plus the two unit files, and it downloads the pinned
+`mcp-token` binary from the same release, verifying it against `checksums.txt`:
+
+```bash
+VER=v1.3.0
+BASE="https://github.com/masuda-masuo/mcp-launcher/releases/download/mcp-token%2F$VER"
+curl -fsSLO "$BASE/mcp-token-mint-socket-$VER.tar.gz"
+curl -fsSLO "$BASE/checksums.txt"
+sha256sum --check --ignore-missing checksums.txt
+tar xzf "mcp-token-mint-socket-$VER.tar.gz"
+scripts/install-mint-socket.sh --config /path/to/launcher.json
+```
+
+See [On-Demand Mint Socket](docs/architecture/mint-socket.md) for the full
 contract, the security boundary, and consumer footguns worth reading before
 bind-mounting the socket into anything.
 

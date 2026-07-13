@@ -7,10 +7,15 @@
 # Usage:
 #   scripts/install-mint-socket.sh [--bin PATH] [--config PATH]
 #
-# Must be run from a checkout of this repo (or with a copy of the
-# systemd/ directory next to this script) -- it copies the unit files
-# rather than embedding them, so a plain `curl | bash` of this script
-# alone will not work.
+# Must be run from a checkout of this repo, or from the mint-socket kit
+# published with every mcp-token release
+# (mcp-token-mint-socket-<version>.tar.gz, which unpacks to the same
+# scripts/ + systemd/ layout and is covered by the release's
+# checksums.txt). The unit files are copied rather than embedded, so a
+# plain `curl | bash` of this script alone will not work -- fetch the
+# kit instead. Installing from the kit needs no Go toolchain and no
+# checkout: the mcp-token binary itself is downloaded from the same
+# release (resolution step 5 below).
 #
 # mcp-token binary resolution order (first hit wins):
 #   1. --bin PATH
@@ -48,15 +53,17 @@ set -euo pipefail
 REPO="masuda-masuo/mcp-launcher"
 
 # Pin: the mcp-token release this installer downloads when it has to
-# fall back to downloading one. mcp-token/v1.2.0 has a checksums.txt
-# uploaded to its release (added retroactively; releases cut from here
-# on get one generated automatically by .github/workflows/release.yml).
-# Bump this when pinning a newer release.
+# fall back to downloading one. It points at the release this copy of
+# the script ships in, so a kit unpacked from release X installs the
+# binary from release X. Bump it in the commit that is about to be
+# tagged, not after.
 #
 # download_and_verify below treats sha256 verification as mandatory: if
 # checksums.txt is missing for the pinned release, it fails loudly
-# rather than installing an unverified binary.
-PINNED_VERSION="mcp-token/v1.2.0"
+# rather than installing an unverified binary. Every release from
+# mcp-token/v1.2.0 on publishes one (.github/workflows/release.yml
+# generates it over the whole dist/ directory).
+PINNED_VERSION="mcp-token/v1.3.0"
 
 INSTALL_BIN_DIR="${HOME}/.local/bin"
 INSTALL_BIN="${INSTALL_BIN_DIR}/mcp-token"
