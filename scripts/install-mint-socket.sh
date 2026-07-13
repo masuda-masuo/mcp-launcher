@@ -5,7 +5,7 @@
 # the design and security boundary.
 #
 # Usage:
-#   scripts/install-mint-socket.sh [--bin PATH]
+#   scripts/install-mint-socket.sh [--bin PATH] [--config PATH]
 #
 # Must be run from a checkout of this repo (or with a copy of the
 # systemd/ directory next to this script) -- it copies the unit files
@@ -22,6 +22,24 @@
 #      required for either file -- see mint-socket.md for why that
 #      property matters: a tool that mints tokens must not itself
 #      require a token to obtain)
+#
+# launcher.json config resolution (first hit wins):
+#   1. --config PATH
+#   2. launcher.json next to the resolved mcp-token binary (see above)
+#   3. otherwise: install fails loudly. mcp-token reads its config via
+#      internal/config.DefaultPath(), which -- absent an explicit
+#      MCP_LAUNCHER_CONFIG -- looks next to *its own binary*. Under
+#      socket activation that means "which launcher.json" is decided
+#      by wherever step 1-5 above happened to resolve the binary from,
+#      which is not something this installer is willing to guess at
+#      silently: a socket that activates but can't mint (missing
+#      config) fails only at first connection, far from install time.
+#      See "Configuration file resolution" in mint-socket.md.
+#
+# Whatever is resolved is written into mcp-token@.service as
+# Environment=MCP_LAUNCHER_CONFIG=<path>, explicitly, every time (see
+# the comment in systemd/mcp-token@.service for why this installer
+# never leaves it unset even when it matches the exe-adjacent default).
 #
 # Idempotent: safe to re-run after a repo pull, a mcp-token upgrade, or
 # a partial/failed previous run.
@@ -48,17 +66,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UNIT_SRC_DIR="${SCRIPT_DIR}/../systemd"
 
 BIN_OVERRIDE=""
+CONFIG_OVERRIDE=""
 
 usage() {
   cat <<'EOF'
-Usage: install-mint-socket.sh [--bin PATH]
+Usage: install-mint-socket.sh [--bin PATH] [--config PATH]
 
 Installs mcp-token.socket + mcp-token@.service into systemd user scope
 and runs `systemctl --user enable --now mcp-token.socket`.
 
-  --bin PATH   Use this mcp-token executable instead of resolving one
-               automatically (PATH / ~/.local/bin / pinned download).
-  -h, --help   Show this help.
+  --bin PATH     Use this mcp-token executable instead of resolving
+                 one automatically (PATH / ~/.local/bin / pinned
+                 download).
+  --config PATH  Use this launcher.json instead of looking for one
+                 next to the resolved mcp-token binary. Written into
+                 mcp-token@.service as
+                 Environment=MCP_LAUNCHER_CONFIG=PATH. If omitted and
+                 no launcher.json is found next to the binary, the
+                 installer fails rather than installing a socket
+                 that cannot mint.
+  -h, --help     Show this help.
 EOF
 }
 
@@ -74,6 +101,18 @@ while [ $# -gt 0 ]; do
       ;;
     --bin=*)
       BIN_OVERRIDE="${1#--bin=}"
+      shift
+      ;;
+    --config)
+      CONFIG_OVERRIDE="${2:-}"
+      if [ -z "${CONFIG_OVERRIDE}" ]; then
+        echo "error: --config requires a path argument" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --config=*)
+      CONFIG_OVERRIDE="${1#--config=}"
       shift
       ;;
     -h|--help)
@@ -184,6 +223,54 @@ resolve_binary() {
   printf '%s\n' "${INSTALL_BIN}"
 }
 
+# resolve_config BIN_PATH
+#
+# Resolution order:
+#   1. --config PATH (validated to exist)
+#   2. launcher.json next to BIN_PATH
+#   3. fail loudly -- see the top-of-file comment and
+#      docs/architecture/mint-socket.md's "Configuration file
+#      resolution" section for why this does not fall through to
+#      installing a socket that can't mint.
+#
+# "launcher.json" is hardcoded here (not imported -- this is a shell
+# script) but must match internal/config.DefaultConfigName in
+# internal/config/path.go.
+resolve_config() {
+  local bin_path="$1" candidate
+
+  if [ -n "${CONFIG_OVERRIDE}" ]; then
+    if [ ! -f "${CONFIG_OVERRIDE}" ]; then
+      log "ERROR: --config ${CONFIG_OVERRIDE} does not exist or is not a file"
+      exit 1
+    fi
+    printf '%s\n' "${CONFIG_OVERRIDE}"
+    return
+  fi
+
+  candidate="$(dirname "${bin_path}")/launcher.json"
+  if [ -f "${candidate}" ]; then
+    printf '%s\n' "${candidate}"
+    return
+  fi
+
+  log "ERROR: no launcher.json found next to the mcp-token binary (${candidate})"
+  log "  and no --config PATH was given."
+  log ""
+  log "  mcp-token resolves its config via internal/config.DefaultPath(),"
+  log "  which -- absent an explicit MCP_LAUNCHER_CONFIG -- looks next to"
+  log "  its own binary. Installing the socket without a resolvable config"
+  log "  would enable a socket that accepts connections but fails to mint"
+  log "  on every one of them (\"loading config: ... launcher.json: no such"
+  log "  file\"), discovered only at first use instead of at install time."
+  log ""
+  log "  Fix: pass --config PATH pointing at your launcher.json, e.g. the"
+  log "  one from an existing install (~/shiori/runtime/launcher.json,"
+  log "  /opt/mcp-launcher/bin/launcher.json, ...), or place a"
+  log "  launcher.json next to the mcp-token binary before re-running."
+  exit 1
+}
+
 main() {
   require_linux
 
@@ -198,13 +285,17 @@ main() {
     exit 1
   fi
 
-  local bin_path
+  local bin_path config_path
   bin_path="$(resolve_binary)"
   log "using mcp-token binary: ${bin_path}"
 
+  config_path="$(resolve_config "${bin_path}")"
+  log "using launcher.json: ${config_path}"
+
   mkdir -p "${UNIT_DIR}"
   cp "${UNIT_SRC_DIR}/mcp-token.socket" "${UNIT_DIR}/mcp-token.socket"
-  sed "s#__MCP_TOKEN_BIN__#${bin_path}#" \
+  sed -e "s#__MCP_TOKEN_BIN__#${bin_path}#" \
+      -e "s#__MCP_LAUNCHER_CONFIG__#${config_path}#" \
     "${UNIT_SRC_DIR}/mcp-token@.service" > "${UNIT_DIR}/mcp-token@.service"
   log "wrote ${UNIT_DIR}/mcp-token.socket and ${UNIT_DIR}/mcp-token@.service"
 
