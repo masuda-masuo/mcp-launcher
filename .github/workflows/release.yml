@@ -127,12 +127,28 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # The mint socket's host-side kit ships as a release asset so it can be
+      # installed on a machine that has neither a Go toolchain nor a checkout
+      # of this repo (the GCP VM in dev-infra is exactly that). The installer
+      # copies the unit files from ../systemd relative to itself rather than
+      # embedding them, so the tarball must preserve that layout.
+      - name: Package mint-socket kit
+        if: startsWith(github.ref_name, 'mcp-token/v')
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#mcp-token/}"
+          mkdir -p kit/scripts kit/systemd
+          cp scripts/install-mint-socket.sh kit/scripts/
+          cp systemd/mcp-token.socket systemd/mcp-token@.service kit/systemd/
+          tar -C kit -czf "dist/mcp-token-mint-socket-$VERSION.tar.gz" scripts systemd
+
       # scripts/install-mint-socket.sh (issue mcp-launcher#25 follow-up:
       # on-demand mint socket) downloads the mcp-token release binary
       # anonymously and verifies it against this file before installing
       # it -- sha256 verification is mandatory there, so every release
       # from this point on must publish checksums.txt alongside its
-      # binaries.
+      # binaries. Generated over dist/* as a whole, so the mint-socket kit
+      # tarball above is covered by the same file.
       - name: Generate checksums
         working-directory: dist
         run: sha256sum * > checksums.txt
