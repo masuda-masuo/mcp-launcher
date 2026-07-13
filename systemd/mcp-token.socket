@@ -1,0 +1,33 @@
+# On-demand mint socket for mcp-token (issue #25 design; see shiori#204
+# for the cross-repo pull-model rationale).
+#
+# Connecting to this socket triggers mcp-token@.service, which runs
+# `mcp-token github` once per connection and streams its stdout (the
+# freshly minted token) back over the socket. There is no daemon and
+# no wall-clock refresh timer: the private key never leaves the OS
+# keystore, and no process holds a token for longer than a single
+# connection lasts.
+#
+# Consumers connect to %t/mcp-token/mint.sock (i.e.
+# /run/user/<uid>/mcp-token/mint.sock in user scope -- %t is systemd's
+# per-user runtime directory), read until EOF, and strip whitespace.
+# There is no request payload; connecting is the request.
+# See docs/architecture/mint-socket.md for the full contract and the
+# security boundary (do not mount this socket into a sandbox container).
+#
+# Installed by scripts/install-mint-socket.sh, which also creates
+# %t/mcp-token/ via DirectoryMode below -- do not point ListenStream at
+# a path inside this repo checkout or any bind-mounted directory (see
+# mint-socket.md's footgun list for why).
+
+[Unit]
+Description=On-demand token mint socket (mcp-token)
+
+[Socket]
+ListenStream=%t/mcp-token/mint.sock
+Accept=yes
+SocketMode=0600
+DirectoryMode=0700
+
+[Install]
+WantedBy=sockets.target
