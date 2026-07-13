@@ -29,12 +29,15 @@ set -euo pipefail
 
 REPO="masuda-masuo/mcp-launcher"
 
-# Pin: bump this after cutting a new mcp-token/vX.Y.Z release that
-# includes checksums.txt (that workflow step ships in the same change
-# as this script). mcp-token/v1.2.0 predates it and has no
-# checksums.txt; download_and_verify below fails loudly rather than
-# skipping verification -- see "sha256 verification is mandatory"
-# below.
+# Pin: the mcp-token release this installer downloads when it has to
+# fall back to downloading one. mcp-token/v1.2.0 has a checksums.txt
+# uploaded to its release (added retroactively; releases cut from here
+# on get one generated automatically by .github/workflows/release.yml).
+# Bump this when pinning a newer release.
+#
+# download_and_verify below treats sha256 verification as mandatory: if
+# checksums.txt is missing for the pinned release, it fails loudly
+# rather than installing an unverified binary.
 PINNED_VERSION="mcp-token/v1.2.0"
 
 INSTALL_BIN_DIR="${HOME}/.local/bin"
@@ -131,9 +134,9 @@ download_and_verify() {
   if ! curl -fsSL -o "${tmpdir}/checksums.txt" "${checksums_url}"; then
     log "ERROR: checksums.txt not found for release ${PINNED_VERSION}."
     log "  sha256 verification is mandatory -- refusing to install an unverified binary."
-    log "  This usually means PINNED_VERSION in this script points at a release cut"
-    log "  before checksums.txt generation was added to .github/workflows/release.yml."
-    log "  Bump PINNED_VERSION to a release that includes it."
+    log "  Every mcp-token release is expected to publish checksums.txt alongside its"
+    log "  binaries (.github/workflows/release.yml generates it). Point PINNED_VERSION"
+    log "  at a release that has one, or attach checksums.txt to this release."
     exit 1
   fi
 
