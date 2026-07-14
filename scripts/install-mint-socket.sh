@@ -63,7 +63,7 @@ REPO="masuda-masuo/mcp-launcher"
 # rather than installing an unverified binary. Every release from
 # mcp-token/v1.2.0 on publishes one (.github/workflows/release.yml
 # generates it over the whole dist/ directory).
-PINNED_VERSION="mcp-token/v1.3.0"
+PINNED_VERSION="mcp-token/v1.3.1"
 
 INSTALL_BIN_DIR="${HOME}/.local/bin"
 INSTALL_BIN="${INSTALL_BIN_DIR}/mcp-token"
@@ -278,6 +278,71 @@ resolve_config() {
   exit 1
 }
 
+# Resolve the user-scope keyring unit mcp-token@.service will Require=.
+#
+# A desktop distro ships gnome-keyring-daemon.service as a user unit and its
+# session already starts and unlocks the keyring; use it. A headless box has
+# the gnome-keyring package but no such unit, so we install our own and
+# bootstrap the one file that makes an unattended unlock actually usable.
+#
+# Echoes the unit name on stdout; logs go to stderr (see log()).
+resolve_keyring_unit() {
+  if systemctl --user cat gnome-keyring-daemon.service >/dev/null 2>&1; then
+    log "keyring: using the distro's gnome-keyring-daemon.service"
+    echo "gnome-keyring-daemon.service"
+    return
+  fi
+
+  log "keyring: no gnome-keyring-daemon.service on this host (headless);"
+  log "  installing ${UNIT_DIR}/mcp-keyring.service instead"
+
+  if [ ! -x /usr/bin/gnome-keyring-daemon ]; then
+    log "ERROR: /usr/bin/gnome-keyring-daemon not found."
+    log "  The mint socket needs a Secret Service to mint from. Install it:"
+    log "    sudo apt-get install -y gnome-keyring dbus-user-session"
+    exit 1
+  fi
+  if [ ! -f "${UNIT_SRC_DIR}/mcp-keyring.service" ]; then
+    log "ERROR: ${UNIT_SRC_DIR}/mcp-keyring.service is missing from this kit."
+    exit 1
+  fi
+
+  # The "default" collection alias. Without this file every keystore write
+  # fails with `failed to unlock correct collection
+  # '/org/freedesktop/secrets/aliases/default'` even though the daemon is up
+  # and the keyring is unlocked -- the single least obvious thing about a
+  # headless keyring. A desktop session writes it for you; nobody writes it on
+  # a server. Never overwrite an existing one: it would point the alias at a
+  # keyring the host does not use.
+  local keyring_dir="${HOME}/.local/share/keyrings"
+  mkdir -p "${keyring_dir}"
+  chmod 700 "${keyring_dir}"
+  if [ -e "${keyring_dir}/default" ]; then
+    log "  keyring alias already set (${keyring_dir}/default) -- left alone"
+  else
+    printf 'login' > "${keyring_dir}/default"
+    chmod 600 "${keyring_dir}/default"
+    log "  wrote ${keyring_dir}/default -> login"
+  fi
+
+  cp "${UNIT_SRC_DIR}/mcp-keyring.service" "${UNIT_DIR}/mcp-keyring.service"
+  systemctl --user daemon-reload
+  systemctl --user enable --now mcp-keyring.service
+
+  # The daemon creates login.keyring on its first unlocked start. If it did
+  # not come up, every mint would fail later at first connection instead of
+  # here -- exactly the silent failure this installer refuses to ship.
+  if ! systemctl --user is-active --quiet mcp-keyring.service; then
+    log "ERROR: mcp-keyring.service failed to start. Diagnose with:"
+    log "    systemctl --user status mcp-keyring.service"
+    log "    journalctl --user -u mcp-keyring.service"
+    exit 1
+  fi
+  log "  mcp-keyring.service is active"
+
+  echo "mcp-keyring.service"
+}
+
 main() {
   require_linux
 
@@ -292,7 +357,7 @@ main() {
     exit 1
   fi
 
-  local bin_path config_path
+  local bin_path config_path keyring_unit
   bin_path="$(resolve_binary)"
   log "using mcp-token binary: ${bin_path}"
 
@@ -300,9 +365,12 @@ main() {
   log "using launcher.json: ${config_path}"
 
   mkdir -p "${UNIT_DIR}"
+  keyring_unit="$(resolve_keyring_unit)"
+
   cp "${UNIT_SRC_DIR}/mcp-token.socket" "${UNIT_DIR}/mcp-token.socket"
   sed -e "s#__MCP_TOKEN_BIN__#${bin_path}#" \
       -e "s#__MCP_LAUNCHER_CONFIG__#${config_path}#" \
+      -e "s#__KEYRING_UNIT__#${keyring_unit}#" \
     "${UNIT_SRC_DIR}/mcp-token@.service" > "${UNIT_DIR}/mcp-token@.service"
   log "wrote ${UNIT_DIR}/mcp-token.socket and ${UNIT_DIR}/mcp-token@.service"
 
