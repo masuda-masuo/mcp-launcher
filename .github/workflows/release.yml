@@ -139,7 +139,8 @@ jobs:
           VERSION="${VERSION#mcp-token/}"
           mkdir -p kit/scripts kit/systemd
           cp scripts/install-mint-socket.sh kit/scripts/
-          cp systemd/mcp-token.socket systemd/mcp-token@.service kit/systemd/
+          cp systemd/mcp-token.socket systemd/mcp-token@.service \
+             systemd/mcp-keyring.service kit/systemd/
           tar -C kit -czf "dist/mcp-token-mint-socket-$VERSION.tar.gz" scripts systemd
 
       # scripts/install-mint-socket.sh (issue mcp-launcher#25 follow-up:

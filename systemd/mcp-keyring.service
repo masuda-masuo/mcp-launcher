@@ -1,0 +1,43 @@
+# Headless gnome-keyring, installed by scripts/install-mint-socket.sh only on
+# hosts that do NOT already ship gnome-keyring-daemon.service as a user unit.
+#
+# A desktop session (WSL with WSLg, any GNOME box) starts gnome-keyring for you
+# and Ubuntu ships /usr/lib/systemd/user/gnome-keyring-daemon.service for it.
+# A headless server does not: the package is installed but no user unit exists,
+# so mcp-token@.service's Requires= on it fails the whole activation job and
+# the socket answers connections with nothing. Measured on the dev-infra GCP
+# VM: "Unit gnome-keyring-daemon.service not found" / "Failed with result
+# 'resources'".
+#
+# Two things make an unattended unlock work, and both are easy to miss:
+#
+#  1. `echo ""` -- a newline, not `echo -n ""`. With an empty (EOF-only) stdin
+#     gnome-keyring can unlock an existing keyring but cannot create one, so a
+#     host that has never had a keyring can never bootstrap itself.
+#
+#  2. ~/.local/share/keyrings/default must name the keyring (the installer
+#     writes it). Without that file the "default" collection alias does not
+#     resolve and every keystore write fails with
+#         failed to unlock correct collection '/org/freedesktop/secrets/aliases/default'
+#     even though the daemon is running and the keyring is unlocked. The file
+#     is 5 bytes ("login", no trailing newline).
+#
+# The empty password is not a weakening: the keyring file lives in the service
+# user's 0700 home on a box where the only other principal is root, and the
+# threat this whole path exists to avoid is a *long-lived* credential sitting
+# in a file (see mint-socket.md, "Security boundary").
+
+[Unit]
+Description=gnome-keyring Secret Service backend (headless, user scope)
+Requires=dbus.socket
+After=dbus.socket
+
+[Service]
+Type=simple
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=%t/bus
+ExecStart=/bin/sh -c 'echo "" | /usr/bin/gnome-keyring-daemon --foreground --components=secrets --unlock'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

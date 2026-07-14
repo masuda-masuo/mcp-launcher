@@ -115,6 +115,29 @@ These were hit empirically wiring a consumer up to a socket like this one and ar
 - **If the socket path doesn't exist yet when a file-level bind mount is requested, Docker silently creates a root-owned directory at that path on the host.** Once that happens, systemd can no longer bind the socket there (the path is now a directory, and it's not writable by the systemd-user-managed process), and the fix requires manually `rmdir`-ing the accidental directory.
   - This is exactly why `mcp-token.socket` uses `%t/mcp-token/mint.sock` with `DirectoryMode=0700`: systemd owns and creates `%t/mcp-token/` itself before the socket exists, so there's no window where a bind-mount tool can race it into creating the wrong thing there.
 
-## Headless keyring unlock (out of scope here, noted for completeness)
+## Headless keyring unlock (measured on the dev-infra GCP VM)
 
-On a machine with no interactive login (a bare GCP VM, a WSL instance nobody has opened a desktop session in), `mcp-token`'s underlying keystore calls into `gnome-keyring-daemon`, which needs its login keyring unlocked. Feeding it a **zero-byte** stdin fails to create a fresh login keyring; feeding it an **empty passphrase followed by a newline** (`printf '\n'`) succeeds and creates one with an empty password. This was measured against dev-infra#5 and is not implemented by anything in this change -- it's a prerequisite for `gnome-keyring-daemon.service` (which `mcp-token@.service` depends on via `Requires=`/`After=`) to be unlockable at all on a fully headless box, and belongs to whatever provisions that box, not to this socket.
+A desktop session starts and unlocks gnome-keyring for you, and the distro ships `gnome-keyring-daemon.service` as a *user* unit for it. **A headless server has the package but no such unit.** `mcp-token@.service` used to hardcode `Requires=gnome-keyring-daemon.service` on the claim that the unit is "present in both WSL and GCP VM environments" — it is not, and the failure it produces is one of the quiet ones:
+
+```
+mcp-token.socket: Failed to queue service startup job ... Unit gnome-keyring-daemon.service not found.
+mcp-token.socket: Failed with result 'resources'.
+```
+
+The socket accepts the connection and the client reads **zero bytes**. Nothing in the mint path ever runs.
+
+So the installer resolves the keyring unit instead of assuming one: it uses `gnome-keyring-daemon.service` where the distro ships it, and otherwise installs [`systemd/mcp-keyring.service`](../../systemd/mcp-keyring.service) and writes its name into `mcp-token@.service`. Two details make the unattended unlock actually work, and both were found the hard way:
+
+1. **`echo ""`, not `echo -n ""`.** With EOF-only stdin, gnome-keyring can unlock an existing keyring but cannot create one — so a host that never had a keyring can never bootstrap itself.
+
+2. **`~/.local/share/keyrings/default` must exist and name the keyring.** It is a 5-byte file containing `login` (no trailing newline). Without it the *default collection alias* does not resolve, and every keystore write fails with
+
+   ```
+   failed to unlock correct collection '/org/freedesktop/secrets/aliases/default'
+   ```
+
+   even though the daemon is running and the keyring is unlocked. A desktop session writes this file for you; nobody writes it on a server. The installer writes it when it installs its own keyring unit, and never overwrites an existing one.
+
+Both the socket and the keyring are **user**-scope units, so on a headless box the service user needs `loginctl enable-linger` — otherwise its systemd user manager (and with it the socket) does not exist until someone logs in, and dies when they log out. The installer warns when linger is off.
+
+Measured across a reboot on the dev-infra GCP VM, with a `nologin` system user and **zero login sessions at any point**: the user manager came up 14 s after boot, `mcp-keyring.service` unlocked the keyring, `mcp-token.socket` listened, and connecting to it activated `mcp-token`, which **read all three entries back out of the keystore**. The run was done with a dummy key, so the mint stopped one step further on (`minting token: generating jwt: failed to decode PEM block`) — that failure is precisely what proves the keystore was reached, and it is the same point a real key would sail past. Before this fix the same connection returned zero bytes and `mcp-token` never ran at all.

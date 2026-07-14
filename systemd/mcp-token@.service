@@ -11,13 +11,20 @@
 # stdout for exactly this reason -- see the stdout-hygiene note in
 # docs/architecture/mint-socket.md if that ever regresses.
 #
-# gnome-keyring-daemon.service is Ubuntu's standard user unit
-# (/usr/lib/systemd/user/gnome-keyring-daemon.service), present in both
-# WSL and GCP VM environments this is deployed to. It is a user-scope
-# unit; do not point this Requires=/After= at a system-scope keyring
-# unit (e.g. a hypothetical mcp-keyring.service) -- a user manager
-# cannot resolve system units, and the dependency would fail the whole
-# activation job, not just degrade it.
+# __KEYRING_UNIT__ is filled in by scripts/install-mint-socket.sh with the
+# user-scope keyring unit it resolved: gnome-keyring-daemon.service where the
+# distro ships one (a desktop, WSL with WSLg), else the mcp-keyring.service the
+# installer puts there itself.
+#
+# It must be a *user*-scope unit that actually exists. A user manager cannot
+# resolve system units, and Requires= on a unit that is not there fails the
+# whole activation job rather than degrading it -- the socket then accepts the
+# connection and returns nothing. This file used to hardcode
+# gnome-keyring-daemon.service on the claim that it is "present in both WSL and
+# GCP VM environments"; it is not. A headless Ubuntu box has the gnome-keyring
+# *package* but no such user unit, and the mint socket failed exactly that way
+# on the dev-infra VM. Requires= is still the right strength -- no keyring means
+# no mint, and that should be loud -- but it has to point at something real.
 #
 # ExecStart= and Environment= below are rewritten by
 # scripts/install-mint-socket.sh to point at the resolved mcp-token
@@ -37,8 +44,8 @@
 
 [Unit]
 Description=Mint a GitHub token for one mcp-token.socket connection
-Requires=gnome-keyring-daemon.service
-After=gnome-keyring-daemon.service
+Requires=__KEYRING_UNIT__
+After=__KEYRING_UNIT__
 
 [Service]
 Type=oneshot
