@@ -63,7 +63,7 @@ REPO="masuda-masuo/mcp-launcher"
 # rather than installing an unverified binary. Every release from
 # mcp-token/v1.2.0 on publishes one (.github/workflows/release.yml
 # generates it over the whole dist/ directory).
-PINNED_VERSION="mcp-token/v1.3.1"
+PINNED_VERSION="mcp-token/v1.3.2"
 
 INSTALL_BIN_DIR="${HOME}/.local/bin"
 INSTALL_BIN="${INSTALL_BIN_DIR}/mcp-token"
@@ -325,9 +325,67 @@ resolve_keyring_unit() {
     log "  wrote ${keyring_dir}/default -> login"
   fi
 
+  # Stop the distro's gnome-keyring from ALSO trying to be the Secret Service.
+  #
+  # Read this before deleting any of it -- it is not obvious and it cost a full
+  # day to find. The gnome-keyring package ships D-Bus *activation* files in
+  # /usr/share/dbus-1/services/ (org.freedesktop.secrets.service,
+  # org.gnome.keyring.service) that map the well-known name
+  # `org.freedesktop.secrets` to `gnome-keyring-daemon --start`. On a headless
+  # box nobody unlocks that daemon's keyring, so:
+  #
+  #   1. The first time ANYTHING asks for org.freedesktop.secrets (e.g. the
+  #      first connection to the mint socket), the session bus auto-activates
+  #      a `--start` daemon and hands it the name.
+  #   2. Our mcp-keyring.service runs `gnome-keyring-daemon ... --unlock`, which
+  #      unlocks a keyring but does NOT win a name the `--start` daemon already
+  #      owns. So the unlocked daemon and the name-owning daemon are two
+  #      different processes.
+  #   3. Every keystore call is routed to the `--start` daemon, whose login
+  #      collection is locked. It tries to pop an interactive unlock prompt
+  #      (org.gnome.keyring.SystemPrompter), which cannot run headless, and
+  #      the call fails with
+  #        failed to unlock correct collection '.../aliases/default'
+  #      -- the same symptom as a missing `default` alias, from a different
+  #      cause, which is exactly what makes it so confusing.
+  #
+  # A desktop session never hits this: its gnome-keyring owns the name AND is
+  # unlocked by PAM at login. The old dev-infra VM avoided it too, by giving
+  # gnome-keyring a *private* D-Bus bus with none of these activation files on
+  # it. On the shared user session bus we have to neutralise the activation so
+  # our mcp-keyring.service is the only thing that can own the name. Verified on
+  # the dev-infra GCP VM: with the activation masked and no competing daemon,
+  # the `--unlock` daemon owns org.freedesktop.secrets and mints succeed.
+  #
+  # /bin/false is a safety net, not the mechanism: mcp-keyring.service is
+  # WantedBy=default.target and mcp-token@.service Requires= it, so our daemon
+  # already owns the name before anything asks. Activation should never fire;
+  # if it does (our daemon down), failing loudly beats silently minting from a
+  # locked keyring.
+  local dbus_svc_dir="${HOME}/.local/share/dbus-1/services"
+  mkdir -p "${dbus_svc_dir}"
+  for name in org.freedesktop.secrets org.gnome.keyring; do
+    cat > "${dbus_svc_dir}/${name}.service" <<MASK
+[D-BUS Service]
+Name=${name}
+Exec=/bin/false
+MASK
+  done
+  log "  masked stock gnome-keyring Secret Service activation (headless)"
+
+  # Kill any --start daemon that already grabbed the name before this ran
+  # (match the full command line: the process comm is truncated to
+  # 'gnome-keyring-d', so a bare `pkill gnome-keyring-daemon` matches nothing).
+  # Leave our own --unlock daemon, if present, alone.
+  pkill -f 'gnome-keyring-daemon --start' 2>/dev/null || true
+  # Make the session bus re-read the (now masked) activation files.
+  busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
+    org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
+
   cp "${UNIT_SRC_DIR}/mcp-keyring.service" "${UNIT_DIR}/mcp-keyring.service"
   systemctl --user daemon-reload
-  systemctl --user enable --now mcp-keyring.service
+  systemctl --user enable mcp-keyring.service
+  systemctl --user restart mcp-keyring.service
 
   # The daemon creates login.keyring on its first unlocked start. If it did
   # not come up, every mint would fail later at first connection instead of
