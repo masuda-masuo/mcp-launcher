@@ -44,6 +44,20 @@ See the README (`On-demand mint socket`) for the exact commands.
 2. The server (a freshly spawned `mcp-token github` process) writes a GitHub token to the connection and closes it. There is no request payload -- **connecting is the request.**
 3. The client reads until EOF and strips surrounding whitespace (`mcp-token`'s output is `fmt.Fprintln(out, token)`, i.e. the token plus a trailing newline).
 
+4. **An empty response means the mint failed. It is never a token.** There is no
+   status code to carry the failure: `mcp-token` writes diagnostics to stderr
+   (`StandardError=journal`, deliberately -- see `systemd/mcp-token@.service`),
+   so a failed mint reaches the client as a clean EOF with nothing before it.
+   A client that does not check will hand an empty string to GitHub and see a
+   `401` far from the cause.
+
+   This is not hypothetical: on 2026-07-29 the dev-infra VM held a corrupted
+   private key for about ten minutes, and every mint during that window
+   returned exactly this -- nothing. Clients must treat an empty (or
+   whitespace-only) response as an error and must not cache it.
+
+   Diagnosing one: `journalctl --user -u 'mcp-token@*'` has the real error.
+
 That's the entire protocol. No framing, no JSON, no auth handshake -- the socket's filesystem permissions (below) are the access control.
 
 ## Configuration file resolution

@@ -52,18 +52,25 @@ set -euo pipefail
 
 REPO="masuda-masuo/mcp-launcher"
 
-# Pin: the mcp-token release this installer downloads when it has to
-# fall back to downloading one. It points at the release this copy of
-# the script ships in, so a kit unpacked from release X installs the
-# binary from release X. Bump it in the commit that is about to be
-# tagged, not after.
+# Pin: the mcp-token release this installer downloads, and the version
+# it upgrades an already-installed binary to (see check_version).
+#
+# Inside a released kit this line is STAMPED with the release tag by
+# .github/workflows/release.yml, so a kit unpacked from release X always
+# installs the binary from release X. The value checked in here is only
+# the fallback for running this script straight from a checkout -- it
+# used to be the only source of truth, and it silently went stale
+# (issue #48: the v1.3.3 kit shipped an installer pinned to v1.3.2).
+#
+# Keep the line's exact shape: the release workflow greps for
+# ^PINNED_VERSION="mcp-token/vX.Y.Z"$ and fails the release if it moves.
 #
 # download_and_verify below treats sha256 verification as mandatory: if
 # checksums.txt is missing for the pinned release, it fails loudly
 # rather than installing an unverified binary. Every release from
 # mcp-token/v1.2.0 on publishes one (.github/workflows/release.yml
 # generates it over the whole dist/ directory).
-PINNED_VERSION="mcp-token/v1.3.2"
+PINNED_VERSION="mcp-token/v1.3.3"
 
 INSTALL_BIN_DIR="${HOME}/.local/bin"
 INSTALL_BIN="${INSTALL_BIN_DIR}/mcp-token"
@@ -168,8 +175,10 @@ download_and_verify() {
   checksums_url="https://github.com/${REPO}/releases/download/${encoded_version}/checksums.txt"
 
   tmpdir="$(mktemp -d)"
+  # RETURN alone leaks the directory when a failure path below calls `exit`:
+  # exit terminates the shell without running RETURN traps. EXIT covers that.
   # shellcheck disable=SC2064
-  trap "rm -rf '${tmpdir}'" RETURN
+  trap "rm -rf '${tmpdir}'" RETURN EXIT
 
   log "downloading ${asset} from release ${PINNED_VERSION} (anonymous, no token required)..."
   if ! curl -fsSL -o "${tmpdir}/${asset}" "${url}"; then
@@ -205,24 +214,92 @@ download_and_verify() {
   log "installed ${INSTALL_BIN}"
 }
 
+# installed_version BIN_PATH -- prints the binary's own version, or "unknown"
+# if it is too old to answer (the subcommand predates mcp-token/v1.1.0) or the
+# call fails for any other reason.
+installed_version() {
+  "$1" version 2>/dev/null | head -n1 | tr -d '[:space:]' || true
+}
+
+# canonical_path PATH -- resolves symlinks so two names for the same file
+# compare equal. Falls back to the input when readlink -f is unavailable or the
+# path does not exist yet (comparing the raw strings is then no worse than
+# before).
+canonical_path() {
+  readlink -f -- "$1" 2>/dev/null || printf '%s' "$1"
+}
+
+# check_version BIN_PATH
+#
+# An already-installed binary used to win outright over PINNED_VERSION, so
+# bumping the pin upgraded the kit and left the binary behind -- silently, with
+# no output saying so. That is issue #48, and it caused a real incident: a
+# v1.3.2 binary received `register github PRIVATE_KEY --stdin` from a caller
+# written for v1.3.3, read "--stdin" as the positional *value*, and stored the
+# flag name as the GitHub App private key while printing a success line.
+#
+# So: when the binary we resolved is the one this installer owns, a version
+# mismatch means re-download. When it is someone else's binary (--bin,
+# MCP_TOKEN_EXE, or a PATH hit outside INSTALL_BIN) we must not overwrite it,
+# but we refuse to pass silently -- the caller has to know the socket will be
+# served by a different version than the kit was built for.
+check_version() {
+  local bin_path="$1" want have
+  want="${PINNED_VERSION#mcp-token/}"
+  have="$(installed_version "${bin_path}")"
+
+  if [ "${have}" = "${want}" ]; then
+    return 0
+  fi
+
+  # Compare canonical paths, not the strings we happened to resolve. A PATH hit
+  # is often a symlink into ~/.local/bin (`~/bin/mcp-token -> INSTALL_BIN` is a
+  # standard way to manage versions), and a literal comparison would call that
+  # "someone else's binary", print the warning, and leave the stale version in
+  # place -- reproducing the very failure this function exists to prevent.
+  if [ "$(canonical_path "${bin_path}")" = "$(canonical_path "${INSTALL_BIN}")" ]; then
+    log "installed mcp-token is ${have:-unknown}, pin is ${want} -- re-downloading (#48)"
+    download_and_verify
+    have="$(installed_version "${INSTALL_BIN}")"
+    if [ "${have}" != "${want}" ]; then
+      log "ERROR: after installing ${want}, the binary reports ${have:-unknown}"
+      exit 1
+    fi
+    return 0
+  fi
+
+  log "WARNING: mcp-token at ${bin_path} reports ${have:-unknown}, but this kit"
+  log "  pins ${want}. Not overwriting a binary this installer does not own."
+  log "  Re-run with --bin ${INSTALL_BIN} (or remove that binary from PATH) to"
+  log "  let the installer manage the version."
+}
+
 resolve_binary() {
   if [ -n "${BIN_OVERRIDE}" ]; then
     if [ ! -x "${BIN_OVERRIDE}" ]; then
       log "ERROR: --bin ${BIN_OVERRIDE} is not an executable file"
       exit 1
     fi
+    check_version "${BIN_OVERRIDE}" >&2
     printf '%s\n' "${BIN_OVERRIDE}"
     return
   fi
   if [ -n "${MCP_TOKEN_EXE:-}" ] && [ -x "${MCP_TOKEN_EXE}" ]; then
+    check_version "${MCP_TOKEN_EXE}" >&2
     printf '%s\n' "${MCP_TOKEN_EXE}"
     return
   fi
   if command -v mcp-token >/dev/null 2>&1; then
-    command -v mcp-token
+    # A PATH hit is frequently INSTALL_BIN itself (~/.local/bin is on PATH on
+    # the dev-infra VM), which is exactly the case check_version upgrades.
+    local found
+    found="$(command -v mcp-token)"
+    check_version "${found}" >&2
+    printf '%s\n' "${found}"
     return
   fi
   if [ -x "${INSTALL_BIN}" ]; then
+    check_version "${INSTALL_BIN}" >&2
     printf '%s\n' "${INSTALL_BIN}"
     return
   fi

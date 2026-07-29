@@ -139,6 +139,23 @@ jobs:
           VERSION="${VERSION#mcp-token/}"
           mkdir -p kit/scripts kit/systemd
           cp scripts/install-mint-socket.sh kit/scripts/
+
+          # Stamp the installer with the release it is shipping in. The checked-in
+          # PINNED_VERSION is only a fallback for running the script straight from
+          # a checkout; leaving it unstamped is what produced issue #48, where the
+          # v1.3.3 kit carried an installer that still downloaded the v1.3.2
+          # binary. Fail loudly if the line ever moves, rather than shipping an
+          # unstamped installer again.
+          if ! grep -qE '^PINNED_VERSION="mcp-token/v[0-9]+\.[0-9]+\.[0-9]+"$' kit/scripts/install-mint-socket.sh; then
+            echo "::error::PINNED_VERSION line not found in install-mint-socket.sh; cannot stamp the kit"
+            exit 1
+          fi
+          sed -i -E "s|^PINNED_VERSION=\"mcp-token/v[0-9]+\.[0-9]+\.[0-9]+\"\$|PINNED_VERSION=\"mcp-token/${VERSION}\"|" \
+            kit/scripts/install-mint-socket.sh
+          grep -q "^PINNED_VERSION=\"mcp-token/${VERSION}\"\$" kit/scripts/install-mint-socket.sh \
+            || { echo "::error::stamping PINNED_VERSION failed"; exit 1; }
+          echo "stamped installer PINNED_VERSION=mcp-token/${VERSION}"
+
           cp systemd/mcp-token.socket systemd/mcp-token@.service \
              systemd/mcp-keyring.service kit/systemd/
           tar -C kit -czf "dist/mcp-token-mint-socket-$VERSION.tar.gz" scripts systemd
