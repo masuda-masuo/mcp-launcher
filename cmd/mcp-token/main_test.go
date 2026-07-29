@@ -491,3 +491,124 @@ func TestRunConvert_ConflictingValueAtNewKey(t *testing.T) {
 		t.Errorf("expected skip message due to conflict, got %q", out)
 	}
 }
+
+func TestRunRegister_PositionalValue(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	err := runRegister([]string{"github", "PRIVATE_KEY", "secret-value"}, store, nil)
+	if err != nil {
+		t.Fatalf("runRegister failed: %v", err)
+	}
+	v, err := store.Get("mcp-token/github/PRIVATE_KEY")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if v != "secret-value" {
+		t.Errorf("expected 'secret-value', got %q", v)
+	}
+}
+
+func TestRunRegister_StdinStoresValue(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	in := strings.NewReader("secret-from-stdin")
+	err := runRegister([]string{"github", "PRIVATE_KEY", "--stdin"}, store, in)
+	if err != nil {
+		t.Fatalf("runRegister --stdin failed: %v", err)
+	}
+	v, err := store.Get("mcp-token/github/PRIVATE_KEY")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if v != "secret-from-stdin" {
+		t.Errorf("expected 'secret-from-stdin', got %q", v)
+	}
+}
+
+func TestRunRegister_StdinStripsTrailingNewlines(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	in := strings.NewReader("multi-line\nvalue\n\n\n")
+	err := runRegister([]string{"github", "PRIVATE_KEY", "--stdin"}, store, in)
+	if err != nil {
+		t.Fatalf("runRegister --stdin failed: %v", err)
+	}
+	v, err := store.Get("mcp-token/github/PRIVATE_KEY")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if v != "multi-line\nvalue" {
+		t.Errorf("expected 'multi-line\\nvalue', got %q", v)
+	}
+}
+
+func TestRunRegister_StdinPreservesInteriorNewlines(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	pem := "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+	in := strings.NewReader(pem)
+	err := runRegister([]string{"github", "PRIVATE_KEY", "--stdin"}, store, in)
+	if err != nil {
+		t.Fatalf("runRegister --stdin failed: %v", err)
+	}
+	v, err := store.Get("mcp-token/github/PRIVATE_KEY")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if v != pem {
+		t.Errorf("expected interior newlines preserved\n got: %q\nwant: %q", v, pem)
+	}
+}
+
+func TestRunRegister_StdinWithTrailingNewlineMatchesCatSubstitution(t *testing.T) {
+	// "$(cat pem)" in shell strips ALL trailing newlines.
+	// The stored value must be byte-identical to what shell command substitution produces.
+	store := keystore.NewMemoryStore()
+	pemBody := "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----\n"
+	in := strings.NewReader(pemBody)
+	err := runRegister([]string{"github", "PRIVATE_KEY", "--stdin"}, store, in)
+	if err != nil {
+		t.Fatalf("runRegister --stdin failed: %v", err)
+	}
+	v, err := store.Get("mcp-token/github/PRIVATE_KEY")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	// "$(cat file)" strips the trailing newline
+	expected := "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----"
+	if v != expected {
+		t.Errorf("trailing-newline stripping does not match shell behavior\n got:  %q\nwant: %q", v, expected)
+	}
+}
+
+func TestRunRegister_BothStdinAndValueError(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	in := strings.NewReader("stdin-value")
+	err := runRegister([]string{"github", "PRIVATE_KEY", "positional-value", "--stdin"}, store, in)
+	if err == nil {
+		t.Fatal("expected error when both positional value and --stdin provided")
+	}
+	if !strings.Contains(err.Error(), "cannot provide both") {
+		t.Errorf("expected 'cannot provide both' error, got %q", err.Error())
+	}
+}
+
+func TestRunRegister_EmptyStdinError(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	in := strings.NewReader("")
+	err := runRegister([]string{"github", "PRIVATE_KEY", "--stdin"}, store, in)
+	if err == nil {
+		t.Fatal("expected error for empty stdin")
+	}
+	if !strings.Contains(err.Error(), "empty") {
+		t.Errorf("expected 'empty' in error, got %q", err.Error())
+	}
+}
+
+func TestRunRegister_StdinOnlyNewlinesError(t *testing.T) {
+	store := keystore.NewMemoryStore()
+	in := strings.NewReader("\n\n\n")
+	err := runRegister([]string{"github", "PRIVATE_KEY", "--stdin"}, store, in)
+	if err == nil {
+		t.Fatal("expected error for stdin consisting only of newlines")
+	}
+	if !strings.Contains(err.Error(), "empty") {
+		t.Errorf("expected 'empty' in error, got %q", err.Error())
+	}
+}

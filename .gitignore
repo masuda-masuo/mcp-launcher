@@ -9,10 +9,12 @@
 *.dylib
 
 # Build output
-mcp-launcher
-mcp-launcher-*
-mcp-token
-mcp-token.exe
+# Anchored to the repo root: an unanchored "mcp-token" also matches the source
+# directory cmd/mcp-token and makes it unstageable.
+/mcp-launcher
+/mcp-launcher-*
+/mcp-token
+/mcp-token.exe
 dist/
 
 # Test binary, built with `go test -c`

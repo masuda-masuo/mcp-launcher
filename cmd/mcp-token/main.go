@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/masuda-masuo/mcp-launcher/internal/config"
@@ -39,7 +40,12 @@ func main() {
 		}
 	}
 	if len(args) >= 1 && args[0] == "register" {
-		if err := runRegister(args[1:]); err != nil {
+		store, err := keystore.NewOSStore()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: initializing keystore: %v\n", err)
+			os.Exit(1)
+		}
+		if err := runRegister(args[1:], store, os.Stdin); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -100,6 +106,7 @@ func main() {
 func usage(w io.Writer) {
 	fmt.Fprintf(w, "Usage: mcp-token <service>\n")
 	fmt.Fprintf(w, "       mcp-token register <service> <ENV_KEY> <value>\n")
+	fmt.Fprintf(w, "       mcp-token register <service> <ENV_KEY> --stdin\n")
 	fmt.Fprintf(w, "       mcp-token list [<service>]\n")
 	fmt.Fprintf(w, "       mcp-token delete <service> <KEY>\n")
 	fmt.Fprintf(w, "       mcp-token delete --all <service>\n")
@@ -108,7 +115,8 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "Mint:  mcp-token <service> prints a fresh short-lived token for <service>\n")
 	fmt.Fprintf(w, "       using the token_source in launcher.json (issue #25).\n\n")
 	fmt.Fprintf(w, "Register: mcp-token register stores a secret in the OS keystore\n")
-	fmt.Fprintf(w, "       under mcp-token/<service>/<ENV_KEY>.\n\n")
+	fmt.Fprintf(w, "       under mcp-token/<service>/<ENV_KEY>. Use --stdin to supply\n")
+	fmt.Fprintf(w, "       the secret via standard input (keeps it off the command line).\n\n")
 	fmt.Fprintf(w, "List:    mcp-token list prints all registered keys.\n")
 	fmt.Fprintf(w, "       mcp-token list <service> prints keys for a specific service.\n\n")
 	fmt.Fprintf(w, "Delete:  mcp-token delete <service> <KEY> deletes a single key.\n")
@@ -174,18 +182,48 @@ func run(serviceName string, store keystore.Store, out io.Writer) error {
 	return nil
 }
 
-func runRegister(args []string) error {
-	if len(args) != 3 {
-		return fmt.Errorf("usage: mcp-token register <service> <ENV_KEY> <value>")
+func runRegister(args []string, store keystore.Store, in io.Reader) error {
+	// --stdin may appear anywhere; everything else is positional.
+	useStdin := false
+	positional := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--stdin" {
+			useStdin = true
+			continue
+		}
+		positional = append(positional, a)
 	}
-	service, envKey, value := args[0], args[1], args[2]
+
+	var service, envKey, value string
+	if useStdin {
+		if len(positional) > 2 {
+			return fmt.Errorf("cannot provide both a positional value and --stdin")
+		}
+		if len(positional) != 2 {
+			return fmt.Errorf("usage: mcp-token register <service> <ENV_KEY> --stdin")
+		}
+		service, envKey = positional[0], positional[1]
+
+		data, err := io.ReadAll(in)
+		if err != nil {
+			return fmt.Errorf("reading stdin: %w", err)
+		}
+		// Trailing newlines are stripped so that piping a pem file stores the
+		// same bytes as the historical `register ... "$(cat pem)"` call --
+		// command substitution strips them too, and a value that differs by a
+		// single byte silently breaks every mint against the stored key.
+		value = strings.TrimRight(string(data), "\n")
+		if value == "" {
+			return fmt.Errorf("stdin is empty; refusing to register an empty secret")
+		}
+	} else {
+		if len(positional) != 3 {
+			return fmt.Errorf("usage: mcp-token register <service> <ENV_KEY> <value>")
+		}
+		service, envKey, value = positional[0], positional[1], positional[2]
+	}
+
 	storeKey := "mcp-token/" + service + "/" + envKey
-
-	store, err := keystore.NewOSStore()
-	if err != nil {
-		return fmt.Errorf("initializing keystore: %w", err)
-	}
-
 	if err := store.Set(storeKey, value); err != nil {
 		return fmt.Errorf("storing secret: %w", err)
 	}
