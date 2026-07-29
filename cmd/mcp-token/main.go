@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -125,6 +126,11 @@ func usage(w io.Writer) {
 	fmt.Fprintf(w, "Convert: mcp-token convert migrates keys from mcp-launcher/ to\n")
 	fmt.Fprintf(w, "       mcp-token/ prefix. Supports --force to skip confirmation.\n")
 	fmt.Fprintf(w, "       mcp-token convert <service> converts only that service.\n\n")
+	fmt.Fprintf(w, "Flags:   an unrecognised --flag is an error, not a value -- every\n")
+	fmt.Fprintf(w, "       positional argument here is a secret or a key name, so a typo\n")
+	fmt.Fprintf(w, "       must not be stored silently. To pass a value that starts with\n")
+	fmt.Fprintf(w, "       \"--\", put it after a literal \"--\":\n")
+	fmt.Fprintf(w, "         mcp-token register github KEY -- --literal-value\n\n")
 	fmt.Fprintf(w, "Env:\n")
 	fmt.Fprintf(w, "  MCP_TOKEN_FETCH_TIMEOUT  GitHub API timeout as a Go duration (default 30s).\n")
 }
@@ -182,17 +188,59 @@ func run(serviceName string, store keystore.Store, out io.Writer) error {
 	return nil
 }
 
-func runRegister(args []string, store keystore.Store, in io.Reader) error {
-	// --stdin may appear anywhere; everything else is positional.
-	useStdin := false
+// longFlagRe matches a long flag of the form --name. It deliberately does NOT
+// match a PEM body: `register <service> <ENV_KEY> "$(cat key.pem)"` passes a
+// value beginning with "-----BEGIN RSA PRIVATE KEY-----", and that historical
+// form has to keep working. Requiring a letter right after exactly two dashes
+// separates "a mistyped flag" from "a secret that happens to start with -".
+var longFlagRe = regexp.MustCompile(`^--[A-Za-z][A-Za-z0-9-]*$`)
+
+// parseFlags splits args into the recognised flags that were present and the
+// remaining positional arguments, and rejects anything that looks like a long
+// flag but is not recognised.
+//
+// Being permissive here is what made issue #49 (and the #48 incident) possible:
+// every positional argument of this tool is a secret or a key name, so an
+// unrecognised flag was silently stored *as the secret* -- `register github
+// PRIVATE_KEY --stdinn` threw away the piped key and stored the string
+// "--stdinn", printing a success line while doing it. A mistyped flag must be
+// an error, not a value.
+//
+// A literal "--" ends flag processing, so a value that genuinely starts with
+// "--" can still be passed: `register github KEY -- --literal`.
+func parseFlags(args []string, known ...string) (map[string]bool, []string, error) {
+	seen := make(map[string]bool, len(known))
+	recognised := make(map[string]struct{}, len(known))
+	for _, k := range known {
+		recognised[k] = struct{}{}
+		seen[k] = false
+	}
+
 	positional := make([]string, 0, len(args))
-	for _, a := range args {
-		if a == "--stdin" {
-			useStdin = true
+	for i, a := range args {
+		if a == "--" {
+			positional = append(positional, args[i+1:]...)
+			return seen, positional, nil
+		}
+		if longFlagRe.MatchString(a) {
+			if _, ok := recognised[a]; !ok {
+				return nil, nil, fmt.Errorf("unknown flag %q (to pass it as a literal value, put it after --)", a)
+			}
+			seen[a] = true
 			continue
 		}
 		positional = append(positional, a)
 	}
+	return seen, positional, nil
+}
+
+func runRegister(args []string, store keystore.Store, in io.Reader) error {
+	// --stdin may appear anywhere; everything else is positional.
+	flags, positional, err := parseFlags(args, "--stdin")
+	if err != nil {
+		return err
+	}
+	useStdin := flags["--stdin"]
 
 	var service, envKey, value string
 	if useStdin {
@@ -235,28 +283,23 @@ func runRegister(args []string, store keystore.Store, in io.Reader) error {
 }
 
 func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer) error {
-	if len(args) == 0 {
+	// --force and --all may appear in any position; everything else is positional.
+	flags, args, err := parseFlags(args, "--force", "--all")
+	if err != nil {
+		return err
+	}
+	force := flags["--force"]
+
+	if len(args) == 0 && !flags["--all"] {
 		return fmt.Errorf("usage: mcp-token delete <service> <KEY | --all>")
 	}
 
-	// Extract --force from any position
-	force := false
-	var filtered []string
-	for _, a := range args {
-		if a == "--force" {
-			force = true
-		} else {
-			filtered = append(filtered, a)
-		}
-	}
-	args = filtered
-
 	// --all <service> [--force]: delete all keys for a service
-	if args[0] == "--all" {
-		if len(args) < 2 {
+	if flags["--all"] {
+		if len(args) != 1 {
 			return fmt.Errorf("usage: mcp-token delete --all <service>")
 		}
-		service := args[1]
+		service := args[0]
 
 		// Collect keys for both current and legacy prefixes
 		prefixes := []string{"mcp-token/" + service + "/", "mcp-launcher/" + service + "/"}
@@ -322,16 +365,11 @@ func runDelete(args []string, store keystore.Store, in io.Reader, out io.Writer)
 
 func runConvert(args []string, store keystore.Store, in io.Reader, out io.Writer) error {
 	// --force from any position
-	force := false
-	var filtered []string
-	for _, a := range args {
-		if a == "--force" {
-			force = true
-		} else {
-			filtered = append(filtered, a)
-		}
+	flags, args, err := parseFlags(args, "--force")
+	if err != nil {
+		return err
 	}
-	args = filtered
+	force := flags["--force"]
 	if len(args) > 1 {
 		return fmt.Errorf("usage: mcp-token convert [<service>]")
 	}
@@ -394,6 +432,16 @@ func runConvert(args []string, store keystore.Store, in io.Reader, out io.Writer
 }
 
 func runList(args []string, store keystore.Store, out io.Writer) error {
+	// list takes no flags; an unrecognised one used to be read as a service name
+	// and reported as "(no keys registered)" with exit 0 (issue #49).
+	_, args, err := parseFlags(args)
+	if err != nil {
+		return err
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("usage: mcp-token list [<service>]")
+	}
+
 	// Search for both current (mcp-token/) and legacy (mcp-launcher/) prefixes
 	// for backward compatibility (issue #27 naming unification).
 	prefixes := []string{"mcp-token/"}
